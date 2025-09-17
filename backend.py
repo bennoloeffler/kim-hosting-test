@@ -40,6 +40,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 class AssessmentData(BaseModel):
     scores: Dict[str, float]
     totalScore: float
@@ -181,7 +184,7 @@ async def submit_assessment(data: AssessmentData):
 @app.get("/")
 async def serve_html():
     """Serve the HTML file"""
-    return FileResponse("25_8_25_KIM_Reifegradanalyse.html", media_type="text/html")
+    return FileResponse("static/index.html", media_type="text/html")
 
 @app.get("/api/health")
 async def health_check():

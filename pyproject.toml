@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kim-hosting-test"
+version = "0.1.0"
+description = "KI-Reifegradanalyse application with FastAPI backend"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "python-dotenv==1.0.0",
+    "pydantic[email]==2.5.0",
+    "python-multipart==0.0.6",
+    "exchangelib>=5.1.0",
+    "msal>=1.24.0",
+    "requests>=2.31.0",
+]
+
+[project.scripts]
+dev = "run_dev:main"
+start = "backend:main"
+
+[tool.uv]
+dev-dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]

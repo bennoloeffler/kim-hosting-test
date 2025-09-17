@@ -270,10 +270,34 @@
             </div>
         </div>
 
+        <!-- Kontaktinformationen Eingabe -->
+        <div class="bg-gray-50 rounded-lg p-6 mb-8 shadow-md">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Kontaktinformationen (Optional)</h3>
+            <p class="text-sm text-gray-600 mb-4">Geben Sie Ihre Kontaktdaten ein, um die Ergebnisse per E-Mail zu erhalten.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input type="text" placeholder="Ihr Name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                    <input type="email" placeholder="Ihre E-Mail" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                    <input type="tel" placeholder="Ihre Telefonnummer" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Unternehmen</label>
+                    <input type="text" placeholder="Ihr Unternehmen" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+            </div>
+        </div>
+
         <!-- Kontaktinformationen für das PDF -->
         <div id="contact-info" class="text-center mt-8 pt-4 border-t border-gray-300 hidden">
             <p class="text-sm text-gray-600">
-                Für weitere Fragen kontaktieren Sie uns unter: 
+                Für weitere Fragen kontaktieren Sie uns unter:
                 <!-- Die Linkfarbe wieder auf das ursprüngliche Indigo ändern -->
                 <a href="mailto:meyer@v-und-s.de" class="text-indigo-600 hover:underline">meyer@v-und-s.de</a>
             </p>
@@ -282,7 +306,7 @@
         <!-- Schaltflächen -->
         <div class="mt-8 text-center flex flex-col sm:flex-row justify-center gap-4">
             <button id="calculate-btn" class="w-full sm:w-auto px-8 py-3 bg-custom-red text-white font-bold rounded-full shadow-lg hover:bg-custom-red-dark transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-custom-red">
-                Scores berechnen
+                Scores berechnen und verschicken
             </button>
             <button id="download-pdf-btn" class="w-full sm:w-auto px-8 py-3 bg-custom-red text-white font-bold rounded-full shadow-lg hover:bg-custom-red-dark transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-custom-red hidden">
                 Ergebnisse als PDF herunterladen
@@ -872,6 +896,94 @@
             resultsSection.classList.remove('hidden');
             insightsContainer.classList.remove('hidden');
             downloadPdfBtn.classList.remove('hidden');
+
+            // Send data to backend
+            sendToBackend(categoryScores, averageTotalScore);
+        }
+
+        /**
+         * Get the recommendation level based on score
+         * @param {number} score - The score from 0 to 100
+         * @returns {string} - The maturity level name
+         */
+        function getRecommendationLevel(score) {
+            const currentLevel = maturityLevels.find(level => score >= level.min && score <= level.max);
+            return currentLevel ? currentLevel.name : "Awareness";
+        }
+
+        async function sendToBackend(categoryScores, totalScore) {
+            console.log('===== SENDING DATA TO BACKEND =====');
+            console.log('Total Score:', totalScore);
+            console.log('Category Scores:', categoryScores);
+
+            // Get maturity level
+            const currentLevel = maturityLevels.find(level => totalScore >= level.min && totalScore <= level.max);
+            const maturityLevel = currentLevel ? currentLevel.name : "Not defined";
+            console.log('Maturity Level:', maturityLevel);
+
+            // Get insights
+            const insights = {};
+            for (const [category, score] of Object.entries(categoryScores)) {
+                const level = getRecommendationLevel(score);
+                if (recommendations[category] && recommendations[category][level]) {
+                    insights[category] = recommendations[category][level];
+                }
+            }
+            console.log('Insights:', insights);
+
+            // Get contact info if available
+            const contactInfo = {};
+            const nameInput = document.querySelector('input[placeholder*="Name"]');
+            const emailInput = document.querySelector('input[placeholder*="E-Mail"]');
+            const phoneInput = document.querySelector('input[placeholder*="Telefon"]');
+            const companyInput = document.querySelector('input[placeholder*="Unternehmen"]');
+
+            if (nameInput && nameInput.value) contactInfo.name = nameInput.value;
+            if (emailInput && emailInput.value) contactInfo.email = emailInput.value;
+            if (phoneInput && phoneInput.value) contactInfo.phone = phoneInput.value;
+            if (companyInput && companyInput.value) contactInfo.company = companyInput.value;
+            console.log('Contact Info:', contactInfo);
+
+            const data = {
+                scores: categoryScores,
+                totalScore: totalScore,
+                maturityLevel: maturityLevel,
+                insights: insights,
+                contactInfo: Object.keys(contactInfo).length > 0 ? contactInfo : null,
+                userAnswers: userAnswers
+            };
+
+            console.log('Full data payload:', JSON.stringify(data, null, 2));
+
+            try {
+                console.log('Sending POST request to http://localhost:8000/api/submit-assessment');
+                const response = await fetch('http://localhost:8000/api/submit-assessment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('✅ Assessment sent successfully:', result);
+                    showMessage('Erfolg', 'Die Ergebnisse wurden erfolgreich per E-Mail versendet!');
+                } else {
+                    const errorText = await response.text();
+                    console.error('❌ Failed to send assessment. Status:', response.status);
+                    console.error('Error response:', errorText);
+                    showMessage('Fehler', `Die Ergebnisse konnten nicht versendet werden. Status: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('❌ Error sending assessment:', error);
+                console.error('Error details:', error.message);
+                showMessage('Fehler', 'Verbindung zum Server fehlgeschlagen. Die Ergebnisse konnten nicht versendet werden.');
+            }
+            console.log('===== END SENDING DATA =====');
         }
 
         // Initialisierung der App beim Laden der Seite

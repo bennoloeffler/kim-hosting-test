@@ -19,7 +19,8 @@ from exchangelib.protocol import BaseProtocol
 import requests
 from msal import ConfidentialClientApplication
 
-load_dotenv()
+# Load .env file (will NOT override existing shell environment variables)
+load_dotenv(override=False)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

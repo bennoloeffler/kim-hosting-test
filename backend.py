@@ -18,13 +18,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-load_dotenv()
+# Load .env file (will NOT override existing shell environment variables)
+load_dotenv(override=False)
 
 logger.info("=" * 80)
 logger.info("BACKEND STARTUP")
 logger.info("=" * 80)
 logger.info("Using Microsoft Exchange OAuth for email")
+logger.info("Environment variable sources:")
+logger.info("  - Shell environment variables take precedence")
+logger.info("  - .env file used as fallback")
 logger.info(f"EWS_SENDER_ADDRESS: {os.getenv('EWS_SENDER_ADDRESS', 'Not set')}")
+logger.info(f"EWS_RECIPIENT_ADDRESS: {os.getenv('EWS_RECIPIENT_ADDRESS', 'Not set')}")
 logger.info(f"EWS_CLIENT_ID: {os.getenv('EWS_CLIENT_ID', 'Not set')}")
 logger.info(f"EWS_TENANT_ID: {os.getenv('EWS_TENANT_ID', 'Not set')}")
 logger.info(f"EWS_CLIENT_SECRET: {'*' * len(os.getenv('EWS_CLIENT_SECRET', '')) if os.getenv('EWS_CLIENT_SECRET') else 'Not set'}")
@@ -52,8 +57,20 @@ class AssessmentData(BaseModel):
     userAnswers: Dict[str, Any]
     timestamp: Optional[str] = None
 
-def send_email(data: AssessmentData, recipient_email: str = "benno.loeffler@gmx.de"):
+def send_email(data: AssessmentData, recipient_email: str = None):
     """Send assessment results via email using Microsoft Exchange"""
+
+    # Use environment variable if no recipient is specified
+    if recipient_email is None:
+        recipient_email = os.getenv('EWS_RECIPIENT_ADDRESS')
+        if not recipient_email:
+            raise HTTPException(
+                status_code=500,
+                detail="No recipient email specified and EWS_RECIPIENT_ADDRESS environment variable not set"
+            )
+        logger.info(f"Using recipient email from EWS_RECIPIENT_ADDRESS environment variable: {recipient_email}")
+    else:
+        logger.info(f"Using explicitly provided recipient email: {recipient_email}")
 
     logger.info("=" * 80)
     logger.info("EMAIL SENDING PROCESS STARTED (Exchange OAuth)")

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -7,12 +8,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
   <style>
     :root {
       --brand: #C9133B; /* Primärfarbe Rot */
@@ -27,218 +27,45 @@
     /* Gauge bars for per-dimension scores */
     .gauge-bar-container { width:100%; height:0.75rem; background:#e5e7eb; border-radius:9999px; overflow:hidden; }
     .gauge-bar { height:100%; border-radius:9999px; transition: width .5s ease-in-out, background-color .5s ease-in-out; background-color:#ef4444; }
-    /* Radio pill styles - elegant and puristic */
-    .pill-group { display:flex; flex-direction:column; gap:0.75rem; }
-    .pill {
-      display:flex;
-      align-items:flex-start;
-      gap:0.75rem;
-      padding:1rem;
-      border:1px solid #e5e7eb;
-      border-radius:0.5rem;
-      background:#fafafa;
-      cursor: pointer;
-      transition: all .15s ease;
-      position: relative;
-    }
-    .pill:hover {
-      border-color:#d1d5db;
-      background:#f9f9f9;
-    }
-    .pill input[type="radio"] {
-      width: 1rem;
-      height: 1rem;
-      margin: 0;
-      margin-top: 0.125rem;
-      cursor: pointer;
-      accent-color: #6b7280;
-    }
-    .pill input[type="radio"]:checked + span {
-      font-weight: 500;
-      color: #374151;
-    }
-    .pill:has(input[type="radio"]:checked) {
-      border-color: #9ca3af;
-      background: #f3f4f6;
-    }
+    /* Radio pill styles */
+    .pill-group { display:flex; flex-direction:column; gap:1.25rem; }
+    .pill { display:flex; align-items:flex-start; gap:1rem; padding:.85rem 1.2rem; border:1px solid #e5e7eb; border-radius:.9rem; background:#fff; transition: border-color .2s, box-shadow .2s; }
+    .pill:hover { border-color:#cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    .pill input[type="radio"] { margin-top:.2rem; }
     /* Segmented control radios for 1–5 Likert (no longer used) */
     .segmented { display:none; }
     .segment { display:none; }
     /* Cards */
     .card { background:#fff; border:1px solid #e5e7eb; border-radius:0.9rem; padding:1.6rem; }
-    /* Elegant button */
-    .btn-brand {
-      background: var(--brand);
-      color: white;
-      transition: all .15s ease;
-    }
-    .btn-brand:hover {
-      background: var(--brand-dark);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(201, 19, 59, 0.15);
-    }
-    .btn-brand:disabled {
-      background: #d1d5db;
-      color: #9ca3af;
-      transform: none;
-      box-shadow: none;
-    }
-    .btn-secondary {
-      background: #374151;
-      color: white;
-      transition: all .15s ease;
-    }
-    .btn-secondary:hover {
-      background: #4b5563;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(55, 65, 81, 0.15);
-    }
-    .btn-secondary:disabled {
-      background: #d1d5db;
-      color: #9ca3af;
-      transform: none;
-      box-shadow: none;
-    }
-    /* Elegant focus */
-    input:focus, button:focus { outline: none; box-shadow: 0 0 0 2px #9ca3af; }
-    /* Likert grid layout - 2 boxes per row */
-    .likert-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-    @media (max-width: 768px) {
-      .likert-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-    .likert-question-box {
-      background: #fafafa;
-      border: 1px solid #e5e7eb;
-      border-radius: 0.5rem;
-      padding: 1rem;
-      transition: all 0.15s ease;
-      display: flex;
-      flex-direction: column;
-      min-height: 150px;
-    }
-    .likert-question-box:hover {
-      border-color: #d1d5db;
-      background: #f9f9f9;
-    }
-    .likert-question-text {
-      font-size: 1rem;
-      color: #374151;
-      line-height: 1.5;
-      font-weight: 400;
-      flex: 1;
-      display: flex;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    .likert-slider-container {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .likert-slider {
-      -webkit-appearance: none;
-      flex: 1;
-      height: 0.5rem;
-      background: linear-gradient(90deg, #e5e7eb 0%, #d1d5db 50%, #9ca3af 100%);
-      border-radius: 9999px;
-      outline: none;
-      cursor: pointer;
-    }
-    /* Untouched state - light grey thumb */
-    .likert-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 1.75rem;
-      height: 1.75rem;
-      border-radius: 9999px;
-      background: #e5e7eb;
-      border: 2px solid #d1d5db;
-      cursor: pointer;
-      margin-top: -0.625rem;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .likert-slider::-moz-range-thumb {
-      width: 1.75rem;
-      height: 1.75rem;
-      border-radius: 9999px;
-      background: #e5e7eb;
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 0 0 2px #d1d5db, 0 2px 4px rgba(0,0,0,0.1);
-      margin-top: -0.625rem;
-    }
-    .likert-slider::-moz-range-track {
-      height: 0.5rem;
-      background: linear-gradient(90deg, #e5e7eb 0%, #d1d5db 50%, #9ca3af 100%);
-      border-radius: 9999px;
-    }
-    /* Touched state - darker grey thumb */
-    .likert-slider.touched::-webkit-slider-thumb {
-      background: #9ca3af;
-      border: 2px solid #6b7280;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-      transform: scale(1.05);
-    }
-    .likert-slider.touched::-moz-range-thumb {
-      background: #9ca3af;
-      box-shadow: 0 0 0 2px #6b7280, 0 2px 6px rgba(0,0,0,0.15);
-      transform: scale(1.05);
-    }
-    .likert-slider:focus {
-      box-shadow: 0 0 0 2px rgba(107,114,128,0.25);
-    }
-    .likert-label {
-      font-size: 0.875rem;
-      color: #6b7280;
-      white-space: nowrap;
-    }
-    .likert-value {
-      font-size: 0.875rem;
-      color: #374151;
-      font-weight: 500;
-      margin-top: 0.5rem;
-      text-align: center;
-    }
+    /* Brand button */
+    .btn-brand { background: var(--brand); color: var(--brand-contrast); }
+    .btn-brand:hover { background: var(--brand-dark); }
+    /* Brand focus */
+    input:focus, button:focus { outline: none; box-shadow: 0 0 0 2px var(--brand); }
+    /* Slider (Likert) in Grautönen */
+    .likert-slider { -webkit-appearance: none; width: 100%; height: 0.5rem; background: linear-gradient(90deg, #e5e7eb 0%, #d1d5db 50%, #9ca3af 100%); border-radius: 9999px; outline: none; }
+    .likert-slider::-webkit-slider-runnable-track { height: 0.5rem; background: linear-gradient(90deg, #e5e7eb 0%, #d1d5db 50%, #9ca3af 100%); border-radius: 9999px; }
+    .likert-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 1rem; height: 1rem; border-radius: 9999px; background: #9ca3af; border: 2px solid #6b7280; cursor: pointer; margin-top: -0.25rem; }
+    .likert-slider::-moz-range-thumb { width: 1rem; height: 1rem; border-radius: 9999px; background: #9ca3af; border: 2px solid #6b7280; cursor: pointer; }
+    .likert-slider::-moz-range-track { height: 0.5rem; background: linear-gradient(90deg, #e5e7eb 0%, #d1d5db 50%, #9ca3af 100%); border-radius: 9999px; }
+    .likert-slider:focus { box-shadow: 0 0 0 2px rgba(107,114,128,0.25); }
     /* Progress */
     .progress-wrap { margin-top:.5rem; }
     .progress-track { width:100%; height:0.5rem; background:#e5e7eb; border-radius:9999px; overflow:hidden; }
-    .progress-bar { height:100%; width:0%; background:#9ca3af; transition: width .3s ease; }
+    .progress-bar { height:100%; width:0%; background:#6b7280; transition: width .3s ease; }
     /* Accordion */
     .accordion-title { display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
     .accordion-title .chev { transition: transform .2s ease; }
     .accordion-title[aria-expanded="true"] .chev { transform: rotate(90deg); }
     .accordion-content { margin-top:1rem; }
-    /* Message box styles */
-    .message-box { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 9999; }
-    .message-box.show { display: flex; }
   </style>
 </head>
 <body class="bg-gray-100 p-4 sm:p-8">
   <div id="app" class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg px-8 sm:px-12 pt-14 sm:pt-24 pb-8 sm:pb-12 relative">
-    <img alt="V&S Logo" src="https://v-und-s.de/wp-content/uploads/2021/11/VS_25_Jahre_Logo_RGB_RZ-300x198.png" class="absolute top-3 right-3 h-12 sm:top-6 sm:right-6 sm:h-20 md:h-24"/>
+    <img alt="V&S Logo" src="https://v-und-s.de/wp-content/uploads/2021/11/VS_25_Jahre_Logo_RGB_RZ-300x198.png" class="hidden sm:block absolute top-6 right-6 h-20 md:h-24"/>
     <div class="text-center mb-10">
-      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">KI-Reifegrad – Service Excellence</h1>
-      <p class="text-gray-600 text-sm sm:text-base"><b>360° Grad KI- Integration - Von Strategie bis Technologie</b> <br>
-Erkennen Sie Ihre Stärken und Potenziale im KI-Reifegrad – übersichtlich in Score und Spidergrafik.</p>
-    </div>
-
-    <!-- Sticky Progress Bar -->
-    <div class="sticky top-0 z-50 bg-white border-b border-gray-200 p-4 mb-6">
-      <div class="max-w-5xl mx-auto">
-        <div class="progress-wrap">
-          <div class="flex justify-between text-sm font-medium text-gray-700 mb-2"><span>Fortschritt</span><span id="progress-text">0/0</span></div>
-          <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
-        </div>
-      </div>
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">KI-Reifegrad – Service im Maschinenbau</h1>
+      <p class="text-gray-600 text-sm sm:text-base">Am Ende erhalten Sie Ihren KI-Reifegrad als Gesamtscore und für die Dimensionen Strategie, Organisation, Regulatorik, Technologie, Aktuelle Operationalisierung und Rahmenbedingungen sowie eine aussagekräftige Spidergrafik der Dimensionen zur Einschätzung Ihres aktuellen KI-Reifegrads.</p>
     </div>
 
     <div class="mb-10 p-6 bg-gray-50 rounded-lg">
@@ -250,6 +77,10 @@ Erkennen Sie Ihre Stärken und Potenziale im KI-Reifegrad – übersichtlich in 
         <label for="firma" class="font-medium text-gray-700 whitespace-nowrap">Firma:</label>
         <input id="firma" type="text" required placeholder="Name der Firma" class="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
       </div>
+      <div class="progress-wrap">
+        <div class="flex justify-between text-xs text-gray-500 mb-1"><span>Fortschritt</span><span id="progress-text">0/0</span></div>
+        <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+      </div>
     </div>
 
     <!-- MCQ Dimensions -->
@@ -259,7 +90,7 @@ Erkennen Sie Ihre Stärken und Potenziale im KI-Reifegrad – übersichtlich in 
     <div id="likert-section" class="space-y-12 mt-12"></div>
 
     <div class="mt-8 text-center flex flex-col sm:flex-row justify-center gap-4">
-      <button id="calc-btn" disabled class="w-full sm:w-auto px-8 py-3 btn-brand font-bold rounded-full shadow-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">Auswertung erstellen</button>
+      <button id="calc-btn" disabled class="w-full sm:w-auto px-8 py-3 btn-brand font-bold rounded-full shadow-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">Scores berechnen</button>
       <button id="reset-btn" class="w-full sm:w-auto px-8 py-3 border border-gray-300 text-gray-700 font-bold rounded-full hover:bg-gray-50 transition">Zurücksetzen</button>
     </div>
     <div id="calc-hint" class="mt-3 text-sm text-red-600 text-center hidden"></div>
@@ -302,17 +133,6 @@ Erkennen Sie Ihre Stärken und Potenziale im KI-Reifegrad – übersichtlich in 
         </div>
       </div>
       <p class="text-sm text-gray-600 mt-8 leading-relaxed">Die Analyse zeigt Ihnen, wo Sie heute stehen. Im Gespräch erfahren Sie, wie andere Unternehmen ihren Weg weitergegangen sind – und welche Optionen es für Sie gibt. Bei Interesse: <a class="text-red-600 font-medium" href="mailto:meyer@v-und-s.de">meyer@v-und-s.de</a></p>
-    </div>
-  </div>
-
-  <!-- Message Box for Alerts -->
-  <div id="message-box" class="message-box">
-    <div class="bg-white rounded-lg p-6 shadow-xl max-w-sm w-full mx-4">
-      <h3 id="message-title" class="text-lg font-bold mb-2 text-gray-800"></h3>
-      <p id="message-body" class="text-sm text-gray-600 mb-4"></p>
-      <div class="flex justify-end">
-        <button onclick="hideMessage()" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">OK</button>
-      </div>
     </div>
   </div>
 
@@ -470,7 +290,7 @@ const LIKERT_GROUPS = [
       "Unterstützt KI die Priorisierung &/oder Sortierung von Servicefällen (z. B. Ticket-Klassifizierung)?",
       "Unterstützt KI die Einsatzplanung durch automatische Tourenoptimierung und Kapazitätsprognosen?",
       "Werden Skills und Verfügbarkeiten von Servicemitarbeitenden durch KI gematcht und dynamisch angepasst?",
-      "Nutzt Ihr Unternehmen KI, um \"Könner\"-Wissen verfügbar zu machen?",
+      "Nutzt Ihr Unternehmen KI, um „Könner“-Wissen verfügbar zu machen?",
       "Nutzen Sie KI für Anfragen- und Angebotsautomatisierung?",
       "Unterstützt KI bei kreativen Tätigkeiten (z. B. Content-Generierung)?",
       "Nutzt Ihr Unternehmen KI, um digitale Serviceprodukte (z. B. KI-gestützte Wartungsservices) zu entwickeln?"
@@ -509,61 +329,6 @@ const GROUP_DISPLAY_ORDER = [
   { key: "Rahmenbedingungen", label: "Rahmenbedingungen" }
 ];
 
-// Recommendations from original index.html
-const recommendations = {
-  "Strategie": {
-    "Awareness": "Definieren Sie klare KI-Ziele und integrieren Sie diese in die Unternehmensstrategie. Beginnen Sie mit der Erforschung der Wettbewerbslandschaft.",
-    "Active": "Etablieren Sie ein dediziertes Budget und ein Team, um erste KI-Projekte zu starten.",
-    "Operational": "Führen Sie KI zur Optimierung bestehender Geschäftsprozesse und zur Effizienzsteigerung ein.",
-    "Systemic": "Integrieren Sie KI als zentralen Wettbewerbsfaktor in Ihr Geschäftsmodell.",
-    "Transformational": "Etablieren Sie eine KI-gestützte Kultur, die Innovationen im gesamten Unternehmen vorantreibt."
-  },
-  "Organisation": {
-    "Awareness": "Beginnen Sie mit der Identifizierung von Mitarbeitern mit KI-Interesse und schaffen Sie Bewusstsein.",
-    "Active": "Bauen Sie erste abteilungsübergreifende Teams auf und definieren Sie klare Verantwortlichkeiten.",
-    "Operational": "Führen Sie regelmäßige Schulungen durch und schaffen Sie Experimentierräume.",
-    "Systemic": "Etablieren Sie eine zentrale KI-Kompetenzstelle mit klaren Rollen und Strukturen.",
-    "Transformational": "Schaffen Sie eine agile, lernende Organisation für schnelle KI-Implementation."
-  },
-  "Technologie": {
-    "Awareness": "Führen Sie eine Bestandsaufnahme Ihrer IT-Infrastruktur und Datenquellen durch.",
-    "Active": "Starten Sie mit der Datenerfassung und Aufbereitung kleiner, relevanter Datensätze.",
-    "Operational": "Implementieren Sie erste Cloud-Dienste und KI-Plattformen zur Prozessautomatisierung.",
-    "Systemic": "Etablieren Sie eine robuste Datenstrategie mit zentraler Datenplattform.",
-    "Transformational": "Setzen Sie auf skalierbare, voll integrierte KI-Infrastrukturen mit MLOps."
-  },
-  "Regulatorik": {
-    "Awareness": "Beginnen Sie mit der Sensibilisierung für Datenschutz und Sicherheitsrichtlinien.",
-    "Active": "Führen Sie erste interne Richtlinien für verantwortungsvollen KI-Einsatz ein.",
-    "Operational": "Etablieren Sie Prozesse zur systematischen Dokumentation der KI-Nutzung.",
-    "Systemic": "Ernennen Sie einen KI-Ethik-Beauftragten und bereiten Sie sich auf den EU AI Act vor.",
-    "Transformational": "Verankern Sie Ethik und Compliance fest in allen KI-Prozessen."
-  },
-  "Aktuelle Operationalisierung": {
-    "Awareness": "Identifizieren Sie erste Use Cases für KI in Ihren Serviceprozessen.",
-    "Active": "Starten Sie Pilotprojekte für KI-gestützte Serviceoptimierung.",
-    "Operational": "Implementieren Sie KI-Tools für Kundenservice und Prozessautomatisierung.",
-    "Systemic": "Integrieren Sie KI durchgängig in Ihre Service-Wertschöpfungskette.",
-    "Transformational": "Entwickeln Sie KI-basierte digitale Serviceprodukte und Geschäftsmodelle."
-  },
-  "Rahmenbedingungen": {
-    "Awareness": "Schaffen Sie Bewusstsein für die Bedeutung von KI in Ihrer Organisation.",
-    "Active": "Entwickeln Sie eine KI-Roadmap und beginnen Sie mit ersten Schulungen.",
-    "Operational": "Etablieren Sie eine Innovationskultur und systematische Weiterbildung.",
-    "Systemic": "Verankern Sie KI-Kompetenz als Kernfähigkeit in der Organisation.",
-    "Transformational": "Werden Sie zum KI-Vorreiter in Ihrer Branche mit eigenen Innovationen."
-  }
-};
-
-// Maturity levels
-const maturityLevels = [
-  { level: 1, name: "Awareness", min: 0, max: 20, color: "border-red-500" },
-  { level: 2, name: "Active", min: 21, max: 40, color: "border-orange-500" },
-  { level: 3, name: "Operational", min: 41, max: 60, color: "border-green-500" },
-  { level: 4, name: "Systemic", min: 61, max: 80, color: "border-blue-500" },
-  { level: 5, name: "Transformational", min: 81, max: 100, color: "border-purple-500" },
-];
-
 // ---------- Rendering ----------
 
 function renderMcq() {
@@ -591,7 +356,7 @@ function renderMcq() {
     const title = document.createElement('h3');
     title.className = "text-lg font-semibold text-gray-800 mb-6 accordion-title";
     title.setAttribute('aria-expanded', 'true');
-    title.innerHTML = `<span>Dimension: ${groupName}</span><span class="chev text-gray-400">›</span>`;
+    title.innerHTML = `<span>Dimension: ${groupName}</span><span class=\"chev text-gray-400\">›</span>`;
     card.appendChild(title);
 
     const content = document.createElement('div');
@@ -618,6 +383,7 @@ function renderMcq() {
         input.id = id;
 
         const span = document.createElement('span');
+        // Keine "Stufe X:"-Präfixe anzeigen
         span.textContent = text;
 
         label.appendChild(input);
@@ -632,26 +398,22 @@ function renderMcq() {
     if (groupName === 'Regulatorik') {
       const regLikert = LIKERT_GROUPS.find(g => g.key === 'Regulatorik');
       if (regLikert) {
-        // Create grid container for regulatorik questions
-        const gridContainer = document.createElement('div');
-        gridContainer.className = 'likert-grid';
-
         regLikert.items.forEach((q, idx) => {
-          const questionBox = document.createElement('div');
-          questionBox.className = 'likert-question-box';
+          const qDiv = document.createElement('div');
+          qDiv.className = "mb-12";
 
-          const questionText = document.createElement('div');
-          questionText.className = 'likert-question-text';
-          questionText.textContent = q;
-          questionBox.appendChild(questionText);
+          const p = document.createElement('p');
+          p.className = "text-gray-800 mb-4 leading-relaxed";
+          p.textContent = q;
+          qDiv.appendChild(p);
 
-          const sliderContainer = document.createElement('div');
-          sliderContainer.className = 'likert-slider-container';
+          const row = document.createElement('div');
+          row.className = "flex items-center gap-6";
 
-          const leftLabel = document.createElement('span');
-          leftLabel.className = 'likert-label';
-          leftLabel.textContent = 'Nein';
-          sliderContainer.appendChild(leftLabel);
+          const leftLab = document.createElement('span');
+          leftLab.className = "text-xs text-gray-500 whitespace-nowrap";
+          leftLab.textContent = "Nein";
+          row.appendChild(leftLab);
 
           const slider = document.createElement('input');
           slider.type = 'range';
@@ -661,49 +423,29 @@ function renderMcq() {
           slider.value = '1';
           slider.name = `likert-${regLikert.key}-${idx}`;
           slider.className = 'likert-slider';
-          slider.dataset.touched = 'false';
-          sliderContainer.appendChild(slider);
+          row.appendChild(slider);
 
-          const rightLabel = document.createElement('span');
-          rightLabel.className = 'likert-label';
-          rightLabel.textContent = 'Ja';
-          sliderContainer.appendChild(rightLabel);
+          const rightLab = document.createElement('span');
+          rightLab.className = "text-xs text-gray-500 whitespace-nowrap";
+          rightLab.textContent = "Ja";
+          row.appendChild(rightLab);
 
-          questionBox.appendChild(sliderContainer);
+          qDiv.appendChild(row);
 
-          const valueDisplay = document.createElement('div');
-          valueDisplay.className = 'likert-value';
+          const helper = document.createElement('div');
+          helper.className = 'text-xs text-gray-500 mt-1';
           const labels = ["Nein", "eher nein", "teilweise", "eher ja", "Ja"];
-          const updateValue = () => {
-            if (slider.dataset.touched === 'false') {
-              valueDisplay.textContent = 'Nicht beantwortet';
-              valueDisplay.style.color = '#9ca3af';
-            } else {
-              const v = parseInt(slider.value, 10);
-              valueDisplay.textContent = `${v} – ${labels[v-1]}`;
-              valueDisplay.style.color = '#374151';
-            }
+          const updateHelper = () => {
+            const v = parseInt(slider.value, 10);
+            helper.textContent = `${v} – ${labels[v-1]}`;
           };
+          slider.addEventListener('input', updateHelper);
+          updateHelper();
+          qDiv.appendChild(helper);
 
-          const activateSlider = () => {
-            if (slider.dataset.touched === 'false') {
-              slider.dataset.touched = 'true';
-              slider.classList.add('touched');
-              updateProgress();
-            }
-            updateValue();
-          };
-
-          slider.addEventListener('input', activateSlider);
-          slider.addEventListener('click', activateSlider);
-
-          updateValue();
-          questionBox.appendChild(valueDisplay);
-
-          gridContainer.appendChild(questionBox);
+          content.appendChild(qDiv);
         });
 
-        content.appendChild(gridContainer);
         runningNumber++;
       }
     }
@@ -732,32 +474,29 @@ function renderLikert() {
     const title = document.createElement('h3');
     title.className = "text-lg font-semibold text-gray-800 mb-6 accordion-title";
     title.setAttribute('aria-expanded', 'true');
-    title.innerHTML = `<span>${MCQ_DIMENSIONS.length + gidx + 1}. ${grp.key}</span><span class="chev text-gray-400">›</span>`;
+    title.innerHTML = `<span>${MCQ_DIMENSIONS.length + gidx + 1}. ${grp.key}</span><span class=\"chev text-gray-400\">›</span>`;
     wrapper.appendChild(title);
 
     const content = document.createElement('div');
     content.className = 'accordion-content';
 
-    // Create grid container
-    const gridContainer = document.createElement('div');
-    gridContainer.className = 'likert-grid';
-
     grp.items.forEach((q, qidx) => {
-      const questionBox = document.createElement('div');
-      questionBox.className = 'likert-question-box';
+      const qDiv = document.createElement('div');
+      qDiv.className = "mb-12";
 
-      const questionText = document.createElement('div');
-      questionText.className = 'likert-question-text';
-      questionText.textContent = q;
-      questionBox.appendChild(questionText);
+      const p = document.createElement('p');
+      p.className = "text-gray-800 mb-4 leading-relaxed";
+      p.textContent = q;
+      qDiv.appendChild(p);
 
-      const sliderContainer = document.createElement('div');
-      sliderContainer.className = 'likert-slider-container';
+      // Slider row
+      const row = document.createElement('div');
+      row.className = "flex items-center gap-6";
 
-      const leftLabel = document.createElement('span');
-      leftLabel.className = 'likert-label';
-      leftLabel.textContent = 'Nein';
-      sliderContainer.appendChild(leftLabel);
+      const leftLab = document.createElement('span');
+      leftLab.className = "text-xs text-gray-500 whitespace-nowrap";
+      leftLab.textContent = "Nein";
+      row.appendChild(leftLab);
 
       const slider = document.createElement('input');
       slider.type = 'range';
@@ -767,51 +506,30 @@ function renderLikert() {
       slider.value = '1';
       slider.name = `likert-${grp.key}-${qidx}`;
       slider.className = 'likert-slider';
-      slider.dataset.touched = 'false';
-      sliderContainer.appendChild(slider);
+      row.appendChild(slider);
 
-      const rightLabel = document.createElement('span');
-      rightLabel.className = 'likert-label';
-      rightLabel.textContent = 'Ja';
-      sliderContainer.appendChild(rightLabel);
+      const rightLab = document.createElement('span');
+      rightLab.className = "text-xs text-gray-500 whitespace-nowrap";
+      rightLab.textContent = "Ja";
+      row.appendChild(rightLab);
 
-      questionBox.appendChild(sliderContainer);
+      qDiv.appendChild(row);
 
-      const valueDisplay = document.createElement('div');
-      valueDisplay.className = 'likert-value';
+      const helper = document.createElement('div');
+      helper.className = 'text-xs text-gray-500 mt-1';
       const labels = ["Nein", "eher nein", "teilweise", "eher ja", "Ja"];
-      const updateValue = () => {
-        if (slider.dataset.touched === 'false') {
-          valueDisplay.textContent = 'Nicht beantwortet';
-          valueDisplay.style.color = '#9ca3af';
-        } else {
-          const v = parseInt(slider.value, 10);
-          valueDisplay.textContent = `${v} – ${labels[v-1]}`;
-          valueDisplay.style.color = '#374151';
-        }
+      const updateHelper = () => {
+        const v = parseInt(slider.value, 10);
+        helper.textContent = `${v} – ${labels[v-1]}`;
       };
+      slider.addEventListener('input', updateHelper);
+      updateHelper();
+      qDiv.appendChild(helper);
 
-      const activateSlider = () => {
-        if (slider.dataset.touched === 'false') {
-          slider.dataset.touched = 'true';
-          slider.classList.add('touched');
-          updateProgress();
-        }
-        updateValue();
-      };
-
-      slider.addEventListener('input', activateSlider);
-      slider.addEventListener('click', activateSlider);
-
-      updateValue();
-      questionBox.appendChild(valueDisplay);
-
-      gridContainer.appendChild(questionBox);
+      content.appendChild(qDiv);
     });
 
-    content.appendChild(gridContainer);
     wrapper.appendChild(content);
-
     // Toggle
     title.addEventListener('click', () => {
       const expanded = title.getAttribute('aria-expanded') === 'true';
@@ -841,11 +559,7 @@ function gartnerFromPercent(p) {
 
 function calculate() {
   const firmaVal = (document.getElementById('firma')?.value || '').trim();
-  if (!firmaVal) {
-    showMessage('Fehler', 'Bitte geben Sie den Firmennamen an.');
-    document.getElementById('firma')?.focus();
-    return;
-  }
+  if (!firmaVal) { alert('Bitte geben Sie den Firmennamen an.'); document.getElementById('firma')?.focus(); return; }
 
   const dimPercents = {};
   const groupBuckets = new Map();
@@ -866,12 +580,8 @@ function calculate() {
     let sum = 0, cnt = 0;
     grp.items.forEach((q, idx) => {
       const sel = document.querySelector(`input[name="likert-${grp.key}-${idx}"]`);
-      if (sel && sel.dataset.touched === 'true') {
-        const val = parseInt(sel.value, 10); // 1..5
-        if (val != null && !Number.isNaN(val)) { sum += val; cnt++; }
-      } else {
-        allAnswered = false;
-      }
+      const val = sel ? parseInt(sel.value, 10) : null; // 1..5
+      if (val != null && !Number.isNaN(val)) { sum += val; cnt++; } else { allAnswered = false; }
     });
     const avg = cnt ? (sum / cnt) : 0;
     const percent = cnt ? normalize(avg, 1, 5) : 0;
@@ -880,7 +590,7 @@ function calculate() {
   });
 
   if (!allAnswered) {
-    showMessage('Fehler', 'Bitte beantworten Sie alle Fragen.');
+    alert("Bitte beantworten Sie alle Fragen.");
     return;
   }
 
@@ -979,95 +689,6 @@ function calculate() {
   if (dl) dl.disabled = false;
   const hint = document.getElementById('calc-hint');
   if (hint) { hint.classList.add('hidden'); hint.textContent = ''; }
-
-  // Send to backend (from original index.html)
-  sendToBackend(aggregatedPercents, overall, g);
-}
-
-// ---------- Backend Integration (from original index.html) ----------
-
-async function sendToBackend(categoryScores, totalScore, maturityInfo) {
-  console.log('===== SENDING DATA TO BACKEND =====');
-  console.log('Total Score:', totalScore);
-  console.log('Category Scores:', categoryScores);
-  console.log('Maturity Level:', maturityInfo.name);
-
-  // Get insights
-  const insights = {};
-  for (const [category, score] of Object.entries(categoryScores)) {
-    const level = maturityLevels.find(l => score >= l.min && score <= l.max);
-    if (level && recommendations[category] && recommendations[category][level.name]) {
-      insights[category] = recommendations[category][level.name];
-    }
-  }
-
-  // Collect user answers
-  const userAnswers = {};
-  MCQ_DIMENSIONS.forEach(dim => {
-    const selected = document.querySelector(`input[name="mcq-${dim.key}"]:checked`);
-    if (selected) {
-      userAnswers[`mcq-${dim.key}`] = parseInt(selected.value, 10);
-    }
-  });
-
-  LIKERT_GROUPS.forEach(grp => {
-    grp.items.forEach((q, idx) => {
-      const sel = document.querySelector(`input[name="likert-${grp.key}-${idx}"]`);
-      if (sel && sel.dataset.touched === 'true') {
-        userAnswers[`likert-${grp.key}-${idx}`] = parseInt(sel.value, 10);
-      }
-    });
-  });
-
-  // Get contact info
-  const nameInput = document.getElementById('name');
-  const firmaInput = document.getElementById('firma');
-
-  const contactInfo = {
-    name: nameInput?.value || '',
-    company: firmaInput?.value || ''
-  };
-
-  const data = {
-    scores: categoryScores,
-    totalScore: totalScore,
-    maturityLevel: maturityInfo.name,
-    insights: insights,
-    contactInfo: contactInfo,
-    userAnswers: userAnswers
-  };
-
-  console.log('Full data payload:', JSON.stringify(data, null, 2));
-
-  try {
-    console.log('Sending POST request to /api/submit-assessment');
-    const response = await fetch('/api/submit-assessment', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data)
-    });
-
-    console.log('Response status:', response.status);
-    console.log('Response ok:', response.ok);
-
-    if (response.ok) {
-      const result = await response.json();
-      console.log('✅ Assessment sent successfully:', result);
-      // showMessage('Erfolg', 'Die Ergebnisse wurden erfolgreich per E-Mail versendet!');
-    } else {
-      const errorText = await response.text();
-      console.error('❌ Failed to send assessment. Status:', response.status);
-      console.error('Error response:', errorText);
-      showMessage('Fehler', `Die Ergebnisse konnten nicht versendet werden. Status: ${response.status}`);
-    }
-  } catch (error) {
-    console.error('❌ Error sending assessment:', error);
-    console.error('Error details:', error.message);
-    showMessage('Fehler', 'Verbindung zum Server fehlgeschlagen. Die Ergebnisse konnten nicht versendet werden.');
-  }
-  console.log('===== END SENDING DATA =====');
 }
 
 // ---------- Data Collection / Export ----------
@@ -1101,13 +722,9 @@ function collectData(requireAll=true) {
     const groupAnswers = [];
     grp.items.forEach((q, idx) => {
       const sel = document.querySelector(`input[name="likert-${grp.key}-${idx}"]`);
-      let val = null;
-      if (sel && sel.dataset.touched === 'true') {
-        val = parseInt(sel.value, 10); // 1..5
-        if (val != null && !Number.isNaN(val)) { sum += val; cnt++; }
-      } else {
-        allAnswered = false;
-      }
+      const val = sel ? parseInt(sel.value, 10) : null; // 1..5
+      if (val != null && !Number.isNaN(val)) { sum += val; cnt++; }
+      else { allAnswered = false; }
       groupAnswers.push({ question: q, value: val, label: val ? likertLabels[val-1] : null });
     });
     const avg = cnt ? (sum / cnt) : 0;
@@ -1147,6 +764,35 @@ function collectData(requireAll=true) {
   };
 }
 
+// ---------- Events ----------
+
+document.getElementById('calc-btn').addEventListener('click', calculate);
+document.getElementById('reset-btn').addEventListener('click', () => {
+  // reset all radios
+  document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+  document.getElementById('results').classList.add('hidden');
+  // remove active state from segmented
+  document.querySelectorAll('.segment').forEach(s => s.classList.remove('active'));
+  // reset sliders to middle and update helper labels
+  document.querySelectorAll('input.likert-slider').forEach(s => {
+    s.value = '1';
+    s.dispatchEvent(new Event('input'));
+  });
+  // clear firm name
+  const firma = document.getElementById('firma');
+  if (firma) firma.value = '';
+  const name = document.getElementById('name');
+  if (name) name.value = '';
+  // disable buttons
+  const dl = document.getElementById('download-btn');
+  if (dl) dl.disabled = true;
+  const calc = document.getElementById('calc-btn');
+  if (calc) calc.disabled = true;
+  // reset progress
+  updateProgress();
+});
+
+// Download results as JSON
 // Generate Excel (.xlsx) using SheetJS
 function generateExcel(data) {
   const wb = XLSX.utils.book_new();
@@ -1179,13 +825,10 @@ function generateExcel(data) {
   XLSX.writeFile(wb, `auswertung_${safeName}_${Date.now()}.xlsx`);
 }
 
-// Generate PDF
+// Generate PDF (Spiderchart + Scores list)
 async function generatePdf(data) {
   const { jsPDF } = window.jspdf || {};
-  if (!jsPDF) {
-    showMessage('Fehler', 'PDF-Bibliothek nicht geladen.');
-    return;
-  }
+  if (!jsPDF) { alert('PDF-Bibliothek nicht geladen.'); return; }
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
   const marginX = 40;
@@ -1211,6 +854,21 @@ async function generatePdf(data) {
   };
   const brandRgb = hexToRgb(brandHex);
 
+  // preload logo (cache across calls)
+  if (!window._vsLogoPromise) {
+    const logoUrl = 'https://v-und-s.de/wp-content/uploads/2021/11/VS_25_Jahre_Logo_RGB_RZ-300x198.png';
+    window._vsLogoPromise = fetch(logoUrl)
+      .then(resp => resp.blob())
+      .then(blob => new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      }))
+      .catch(() => null);
+  }
+  const logoDataUrl = await window._vsLogoPromise;
+
   // Header banner
   const headerHeight = 90;
   doc.setFillColor(brandRgb.r, brandRgb.g, brandRgb.b);
@@ -1231,6 +889,12 @@ async function generatePdf(data) {
   doc.text(`Datum: ${new Date().toLocaleDateString('de-DE')}`, marginX, headerInfoY);
   doc.textWithLink('meyer@v-und-s.de', pageWidth - marginX - 120, 60, { url: 'mailto:meyer@v-und-s.de' });
 
+  if (logoDataUrl) {
+    const logoWidth = 90;
+    const logoHeight = logoWidth * (198 / 300);
+    doc.addImage(logoDataUrl, 'PNG', pageWidth - marginX - logoWidth, 18, logoWidth, logoHeight);
+  }
+
   doc.setTextColor(31, 41, 55);
   let currentY = headerHeight + 24;
 
@@ -1249,10 +913,28 @@ async function generatePdf(data) {
   doc.setFontSize(12);
   doc.setTextColor(31, 41, 55);
   doc.text(`Reifegrad: Level ${data.gartner.level} – ${data.gartner.name}`, marginX + 200, currentY + 32);
+  doc.setFontSize(10);
+  doc.setTextColor(107, 114, 128);
+  doc.text('Kontakt:', marginX + contentW - 150, currentY + 24);
+  doc.textWithLink('meyer@v-und-s.de', marginX + contentW - 90, currentY + 24, { url: 'mailto:meyer@v-und-s.de' });
 
-  currentY += summaryHeight + 36; // More space after summary
+  currentY += summaryHeight + 26;
 
-  // Dimension scores table
+  // Disclaimer
+  doc.setFontSize(10);
+  doc.setTextColor(55, 65, 81);
+  const disclaimer = 'Die Ergebnisse geben Ihnen einen ersten Eindruck Ihres KI-Reifegrads. Eine vollständige Bewertung umfasst jedoch weitere qualitative Aspekte – sprechen Sie uns gern für eine vertiefte Analyse an und vereinbaren Sie jetzt Ihr unverbindliches und kostenfreies Erstgespräch. Im Gespräch erfahren Sie, wie andere Unternehmen ihren Weg weitergegangen sind – und welche Optionen es für Sie gibt. Bei Interesse:';
+  const disclaimerLines = doc.splitTextToSize(disclaimer, contentW);
+  disclaimerLines.forEach(line => {
+    currentY = newPageIfNeeded(currentY, 14);
+    doc.text(line, marginX, currentY);
+    currentY += 12;
+  });
+  currentY = newPageIfNeeded(currentY, 14);
+  doc.textWithLink('meyer@v-und-s.de', marginX, currentY, { url: 'mailto:meyer@v-und-s.de' });
+  currentY += 22;
+
+  // Dimension table
   doc.setFontSize(12);
   doc.setTextColor(31, 41, 55);
   doc.text('Scores je Dimension', marginX, currentY);
@@ -1282,116 +964,104 @@ async function generatePdf(data) {
     }
   }
 
-  currentY += numRows * rowHeight + 28; // More space after table
+  currentY += numRows * rowHeight + 18;
 
-  // Radar chart (if available) - larger size
+  // Radar chart
   const canvas = document.getElementById('radar');
   if (canvas) {
-    const chartHeight = 300; // Increased from 220
-    currentY = newPageIfNeeded(currentY, chartHeight + 60); // More space
+    const chartHeight = 220;
+    currentY = newPageIfNeeded(currentY, chartHeight + 30);
     doc.setFontSize(12);
     doc.setTextColor(31, 41, 55);
     doc.text('Radar-Darstellung', marginX, currentY);
-    currentY += 20; // More space after title
+    currentY += 10;
     const imgData = canvas.toDataURL('image/png', 1.0);
     const ratio = canvas.height ? (canvas.height / canvas.width) : (320 / 480);
     const imgW = Math.min(contentW, chartHeight / ratio);
     const imgH = imgW * ratio;
     const offsetX = marginX + (contentW - imgW) / 2;
     doc.addImage(imgData, 'PNG', offsetX, currentY, imgW, imgH);
-    currentY += imgH + 40; // More space after chart
+    currentY += imgH + 24;
   }
 
-  // Disclaimer section
-  currentY = newPageIfNeeded(currentY, 120); // Ensure enough space for disclaimer
-  currentY += 20; // Extra space before disclaimer
+  // Details section
+  let y = newPageIfNeeded(currentY, 60);
+  doc.setFontSize(13);
+  doc.setTextColor(31, 41, 55);
+  doc.text('Details – Antworten', marginX, y);
+  y += 10;
+  doc.setFontSize(12);
+  y += 10;
 
-  doc.setFontSize(10);
-  doc.setTextColor(107, 114, 128);
-  const disclaimerText = "Die Ergebnisse geben Ihnen einen ersten Eindruck Ihres KI-Reifegrads. Eine vollständige Bewertung umfasst jedoch weitere qualitative Aspekte – sprechen Sie uns gern für eine vertiefte Analyse an und vereinbaren Sie jetzt Ihr unverbindliches und kostenfreies Erstgespräch. Im Gespräch erfahren Sie, wie andere Unternehmen ihren Weg weitergegangen sind – und welche Optionen es für Sie gibt. Bei Interesse:";
+  doc.text('MCQ (beschreibende Antworten):', marginX, y);
+  y += 16;
+  doc.setFontSize(11);
+  data.details.mcq.forEach((row, idx) => {
+    const val = row.value != null ? row.value : '-';
+    const header = `${idx + 1}. ${row.dimension} – Wert: ${val}`;
+    y = newPageIfNeeded(y, line * 2);
+    doc.text(header, marginX, y);
+    y += line;
+    if (row.text) {
+      const wrapped = doc.splitTextToSize(row.text, contentW);
+      for (const w of wrapped) {
+        y = newPageIfNeeded(y, line);
+        doc.text(w, marginX, y);
+        y += line;
+      }
+    } else {
+      y += 2;
+    }
+    y += 6;
+  });
 
-  const lines = doc.splitTextToSize(disclaimerText, contentW);
-  doc.text(lines, marginX, currentY);
-  currentY += lines.length * 12 + 10; // Space for text + gap
-
-  // Clickable email link
-  doc.setFontSize(10);
-  doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
-  doc.textWithLink('meyer@v-und-s.de', marginX, currentY, { url: 'mailto:meyer@v-und-s.de' });
+  y = newPageIfNeeded(y, 30);
+  doc.setFontSize(12);
+  doc.setTextColor(31, 41, 55);
+  doc.text('Likert (1–5, Nein–Ja):', marginX, y);
+  y += 16;
+  doc.setFontSize(11);
+  data.details.likert.forEach(group => {
+    y = newPageIfNeeded(y, line);
+    doc.text(`Gruppe: ${group.group}`, marginX, y);
+    y += line;
+    group.answers.forEach((a, i) => {
+      const val = a.value != null ? `${a.value} – ${a.label || ''}` : '-';
+      const qPrefix = `${i + 1}) `;
+      const wrappedQ = doc.splitTextToSize(qPrefix + a.question, contentW);
+      wrappedQ.forEach(lineText => {
+        y = newPageIfNeeded(y, line);
+        doc.text(lineText, marginX, y);
+        y += line;
+      });
+      y = newPageIfNeeded(y, line);
+      doc.text(`Antwort: ${val}`, marginX, y);
+      y += line + 4;
+    });
+    y += 6;
+  });
 
   const safeName = (data.firma || 'unternehmen').replace(/[^a-z0-9_-]+/gi, '_');
   doc.save(`auswertung_${safeName}_${Date.now()}.pdf`);
 }
 
-// ---------- Events ----------
-
-document.getElementById('calc-btn').addEventListener('click', calculate);
-document.getElementById('reset-btn').addEventListener('click', () => {
-  // reset all radios
-  document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
-  document.getElementById('results').classList.add('hidden');
-  // reset likert sliders
-  document.querySelectorAll('input[name^="likert-"]').forEach(s => {
-    s.value = '1';
-    s.dataset.touched = 'false';
-    s.classList.remove('touched');
-    s.dispatchEvent(new Event('input'));
-  });
-  // clear firm name
-  const firma = document.getElementById('firma');
-  if (firma) firma.value = '';
-  const name = document.getElementById('name');
-  if (name) name.value = '';
-  // disable buttons
-  const dl = document.getElementById('download-btn');
-  if (dl) dl.disabled = true;
-  const calc = document.getElementById('calc-btn');
-  if (calc) calc.disabled = true;
-  // reset progress
-  updateProgress();
-});
-
 document.getElementById('download-btn')?.addEventListener('click', async () => {
   const firmaVal = (document.getElementById('firma')?.value || '').trim();
-  if (!firmaVal) {
-    showMessage('Fehler', 'Bitte geben Sie den Firmennamen an.');
-    document.getElementById('firma')?.focus();
-    return;
-  }
+  if (!firmaVal) { alert('Bitte geben Sie den Firmennamen an.'); document.getElementById('firma')?.focus(); return; }
   const data = collectData(true);
-  if (!data) {
-    showMessage('Fehler', 'Bitte beantworten Sie alle Fragen, bevor Sie die Auswertung herunterladen.');
-    return;
-  }
+  if (!data) { alert('Bitte beantworten Sie alle Fragen, bevor Sie die Auswertung herunterladen.'); return; }
   try {
-    // Generate both Excel and PDF files
     generateExcel(data);
     await generatePdf(data);
   } catch (e) {
     console.error(e);
-    showMessage('Fehler', 'Beim Erstellen der Auswertung ist ein Fehler aufgetreten.');
+    alert('Beim Erstellen der Dateien ist ein Fehler aufgetreten.');
   }
 });
-
-// Message box functions
-function showMessage(title, body) {
-  const messageBox = document.getElementById('message-box');
-  const messageTitle = document.getElementById('message-title');
-  const messageBody = document.getElementById('message-body');
-  messageTitle.textContent = title;
-  messageBody.textContent = body;
-  messageBox.classList.add('show');
-}
-
-function hideMessage() {
-  const messageBox = document.getElementById('message-box');
-  messageBox.classList.remove('show');
-}
 
 // Init
 renderMcq();
 renderLikert();
-
 // Bind progress and enable/disable logic
 (function initUX(){
   function answeredMcqCount(){
@@ -1403,22 +1073,16 @@ renderLikert();
     return cnt;
   }
   window.updateProgress = function(){
-    const totalMcq = MCQ_DIMENSIONS.length;
-    const totalLikert = LIKERT_GROUPS.reduce((sum, grp) => sum + grp.items.length, 0);
-    const total = totalMcq + totalLikert;
-
-    const answeredMcq = answeredMcqCount();
-    const answeredLikert = document.querySelectorAll('input[name^="likert-"].touched').length;
-    const answered = answeredMcq + answeredLikert;
-
-    const pct = total ? Math.round(answered/total*100) : 0;
+    const total = MCQ_DIMENSIONS.length;
+    const ans = answeredMcqCount();
+    const pct = total ? Math.round(ans/total*100) : 0;
     const bar = document.getElementById('progress-bar');
     const txt = document.getElementById('progress-text');
     if (bar) bar.style.width = pct + '%';
-    if (txt) txt.textContent = `${answered}/${total}`;
+    if (txt) txt.textContent = `${ans}/${total}`;
     const calc = document.getElementById('calc-btn');
     const firma = (document.getElementById('firma')?.value || '').trim();
-    const ready = answered === total && !!firma;
+    const ready = ans === total && !!firma;
     if (calc) calc.disabled = !ready;
 
     // Build hint message if not ready

@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-sclae=1.0">
+    <title>KI-Reifegradanalyse</title>
+    <!-- 
+        Tailwind CSS ist ein Utility-First-CSS-Framework, das schnelle und
+        responsive Designs ermöglicht. Die Klassen werden direkt in HTML-Elementen
+        verwendet.
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js für die Visualisierung -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF für den PDF-Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 
+        Der Inter-Font sorgt für eine moderne und gut lesbare Typografie.
+        Die Schriftart wird über Google Fonts geladen.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /*
+            Die .scale-container-Klasse definiert das Layout für die Reifegrad-Skala.
+            Es ist ein Flex-Container, der die Segmente nebeneinander anordnet.
+        */
+        .scale-container {
+            position: relative;
+            height: 1.5rem; /* Höhe der Skala */
+            display: flex;
+            align-items: center;
+            border-radius: 9999px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+        }
+        /* Jedes Segment der Skala (Awareness, Active, etc.) hat eine eigene Klasse.
+            flex-grow: 1 stellt sicher, dass jedes Segment den gleichen Anteil
+            am verfügbaren Platz einnimmt.
+        */
+        .scale-segment {
+            height: 100%;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+            font-size: 0.75rem;
+            line-height: 1rem;
+        }
+        /*
+            Der Indikator ist der verschiebbare Punkt auf der Skala.
+            Er wird absolut positioniert und mit JavaScript verschoben.
+            Die Transition sorgt für eine sanfte Animation beim Verschieben.
+        */
+        .indicator {
+            position: absolute;
+            width: 1rem;
+            height: 1rem;
+            background-color: white;
+            border-radius: 9999px;
+            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+            transform: translateX(-50%);
+            transition: left 0.5s ease-in-out;
+            border: 2px solid;
+            z-index: 10;
+        }
+
+        /* Styling für den Schieberegler */
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        .slider-container input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 0.5rem;
+            /* Angepasster Farbverlauf, der den Gartner-Modellfarben ähnelt */
+            background: linear-gradient(to right, #ef4444, #f97316, #22c55e, #3b82f6, #a855f7);
+            border-radius: 9999px;
+            outline: none;
+            transition: all 0.2s ease-in-out;
+        }
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 1.5rem;
+            height: 1.5rem;
+            background: #fff;
+            border: 2px solid #6366f1;
+            border-radius: 9999px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+        }
+        .slider-container input[type="range"]::-moz-range-thumb {
+            width: 1.5rem;
+            height: 1.5rem;
+            background: #fff;
+            border: 2px solid #6366f1;
+            border-radius: 9999px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+        }
+        .slider-labels-container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 0.25rem;
+            font-size: 0.75rem;
+            color: #4b5563;
+        }
+        .slider-labels-container span {
+            text-align: center;
+        }
+        /* Styles for the individual gauge bars */
+        .gauge-bar-container {
+            width: 100%;
+            height: 0.75rem;
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        .gauge-bar {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+            background-color: #ef4444; /* Default red */
+        }
+        /* PDF specific styles */
+        .pdf-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .pdf-content h1, .pdf-content h2, .pdf-content h3 {
+            color: #374151;
+            font-weight: bold;
+        }
+        .pdf-content h1 { font-size: 2rem; }
+        .pdf-content h2 { font-size: 1.5rem; }
+        .pdf-content h3 { font-size: 1.25rem; }
+        .pdf-content p {
+            font-size: 1rem;
+            color: #4b5563;
+        }
+
+        /* Benutzerdefinierte Farben */
+        .bg-custom-red {
+            background-color: #C9133B;
+        }
+        .hover\:bg-custom-red-dark:hover {
+            background-color: #A3102F; /* Slightly darker shade for hover effect */
+        }
+        .text-custom-red {
+            color: #C9133B;
+        }
+        .border-custom-red {
+            border-color: #C9133B;
+        }
+        .focus\:ring-custom-red:focus {
+            --tw-ring-color: #C9133B;
+        }
+        .bg-custom-red-light {
+            background-color: #F8E5E9; /* Sehr helle Version für den Hintergrund */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-8">
+    <!-- Main content container for PDF generation -->
+    <div id="pdf-content" class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-6 sm:p-10 relative">
+        <!-- Logo in der oberen linken Ecke -->
+        <img src="/static/KIM.png" alt="KIM Logo" class="absolute top-4 left-4 w-24 h-auto">
+
+        <!-- Kopfbereich der Anwendung -->
+        <div class="text-center mb-8 pt-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">KI-Reifegradanalyse</h1>
+            <p class="text-gray-600 text-sm sm:text-base">
+                Bitte beantworten Sie die Fragen selbstkritisch und so genau wie möglich.
+            </p>
+        </div>
+
+        <!-- Eingabefeld für den Firmennamen und Anweisungen -->
+        <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+            <div class="flex items-center mb-4">
+                <label for="firma" class="font-medium text-gray-700 mr-2 whitespace-nowrap">Firma:</label>
+                <!-- Der focus-ring wurde auf die neue benutzerdefinierte Farbe geändert -->
+                <input type="text" id="firma" class="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-custom-red" placeholder="Name der Firma eingeben">
+            </div>
+            <p class="text-xs text-gray-500 italic">
+                Bitte verwenden Sie den Schieberegler von Rot (Nein) zu Lila (Ja).
+            </p>
+        </div>
+
+        <!-- Bereich für die dynamisch generierten Fragen -->
+        <div id="questionnaire-container">
+            <!-- Fragen werden hier mit JavaScript eingefügt -->
+        </div>
+        
+        <!-- Bereich für die Scores und die Visualisierung -->
+        <!-- Hintergrund und Rand wieder auf die ursprünglichen Graustufen ändern -->
+        <div id="results-section" class="mt-8 p-6 bg-gray-100 rounded-xl border border-gray-200 hidden">
+            <!-- Überschrift-Farbe wurde auf Schwarz geändert -->
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Ihre Scores</h2>
+            <div id="scores-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Scores werden hier mit JavaScript eingefügt -->
+            </div>
+            <!-- Rahmenfarbe wieder auf Indigo ändern -->
+            <div class="mt-6 pt-4 border-t border-indigo-200">
+                <!-- Textfarbe wurde auf Schwarz geändert -->
+                <div class="flex justify-between items-center text-lg font-bold text-gray-900">
+                    <span>Gesamtscore:</span>
+                    <!-- Textfarbe wurde auf Schwarz geändert -->
+                    <span id="total-score" class="text-2xl font-extrabold text-gray-900">0.0%</span>
+                </div>
+                <!-- Visualisierung der Reifegrad-Skala -->
+                <div class="mt-4">
+                    <p class="text-sm text-center text-gray-600 mb-2">Ihr KI-Reifegrad (Gartner AI Maturity Model)</p>
+                    <div class="scale-container">
+                        <div class="scale-segment bg-red-500">Awareness</div>
+                        <div class="scale-segment bg-orange-500">Active</div>
+                        <div class="scale-segment bg-green-500">Operational</div>
+                        <div class="scale-segment bg-blue-500">Systemic</div>
+                        <!-- Segmentfarbe wieder auf Lila ändern -->
+                        <div class="scale-segment bg-purple-500">Transformational</div>
+                        <!-- Rahmenfarbe des Indikators wieder auf die ursprüngliche rote Farbe ändern -->
+                        <div id="maturity-indicator" class="indicator border-red-500" style="left: 0%;"></div>
+                    </div>
+                    <p id="maturity-level-text" class="text-center mt-2 font-semibold text-gray-800 text-base">Level 1: Awareness</p>
+                </div>
+            </div>
+            
+            <!-- Erklärung des Reifegrads -->
+            <div id="explanation-container" class="mt-8 p-6 bg-white rounded-xl">
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">Was bedeutet KI-Reifegrad?</h3>
+                <p class="text-sm text-gray-600">
+                    Der Entwicklungsstand des Unternehmens in Bezug auf KI-Integration. Operationalisiert durch
+                    Dimensionen (strategisch, organisatorisch, technisch, kulturell, regulatorisch), die jeweils auf
+                    Likert-Skalen erhoben und zu einem Gesamtindex verdichtet werden. Ein hoher Reifegrad
+                    bedeutet z. B., dass eine KI-Strategie vorliegt, KI in Kernprozessen verankert ist und eine
+                    innovationsfreundliche Kultur besteht. Angelehnt an Reifegradmodelle (z. B. Gartner 5-Stufen-Modell
+                    von Awareness bis Transformational) wird die Einordnung von „anfänglich“ bis „fortgeschritten“
+                    ermöglicht.
+                </p>
+            </div>
+
+            <!-- Radar-Chart -->
+            <div class="mt-8">
+                <!-- Überschrift-Farbe wurde auf Schwarz geändert -->
+                <h3 class="text-xl font-semibold text-gray-900 text-center mb-4">Reifegrad pro Dimension</h3>
+                <canvas id="radarChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Bereich für die Handlungsempfehlungen -->
+        <div id="insights-container" class="mt-8 p-6 bg-gray-100 rounded-xl hidden">
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 text-center">Handlungsempfehlungen</h2>
+            <div id="insights-list" class="space-y-6">
+                <!-- Empfehlungen werden hier dynamisch eingefügt -->
+            </div>
+        </div>
+
+        <!-- Kontaktinformationen Eingabe -->
+        <div class="bg-gray-50 rounded-lg p-6 mb-8 shadow-md">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Kontaktinformationen (Optional)</h3>
+            <p class="text-sm text-gray-600 mb-4">Geben Sie Ihre Kontaktdaten ein, um die Ergebnisse per E-Mail zu erhalten.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input type="text" placeholder="Ihr Name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                    <input type="email" placeholder="Ihre E-Mail" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                    <input type="tel" placeholder="Ihre Telefonnummer" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Unternehmen</label>
+                    <input type="text" placeholder="Ihr Unternehmen" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Kontaktinformationen für das PDF -->
+        <div id="contact-info" class="text-center mt-8 pt-4 border-t border-gray-300 hidden">
+            <p class="text-sm text-gray-600">
+                Für weitere Fragen kontaktieren Sie uns unter:
+                <!-- Die Linkfarbe wieder auf das ursprüngliche Indigo ändern -->
+                <a href="mailto:meyer@v-und-s.de" class="text-indigo-600 hover:underline">meyer@v-und-s.de</a>
+            </p>
+        </div>
+
+        <!-- Schaltflächen -->
+        <div class="mt-8 text-center flex flex-col sm:flex-row justify-center gap-4">
+            <button id="calculate-btn" class="w-full sm:w-auto px-8 py-3 bg-custom-red text-white font-bold rounded-full shadow-lg hover:bg-custom-red-dark transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-custom-red">
+                Scores berechnen und verschicken
+            </button>
+            <button id="download-pdf-btn" class="w-full sm:w-auto px-8 py-3 bg-custom-red text-white font-bold rounded-full shadow-lg hover:bg-custom-red-dark transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-custom-red hidden">
+                Ergebnisse als PDF herunterladen
+            </button>
+        </div>
+
+        <!-- Benutzerdefinierte Meldungsbox, um Alerts zu ersetzen -->
+        <div id="message-box" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-lg p-6 shadow-xl max-w-sm w-full">
+                <h3 id="message-title" class="text-lg font-bold mb-2 text-gray-800"></h3>
+                <p id="message-body" class="text-sm text-gray-600 mb-4"></p>
+                <div class="flex justify-end">
+                    <button onclick="document.getElementById('message-box').classList.add('hidden')" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">OK</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // JavaScript-Code für die App-Funktionalität
+        let myRadarChart = null;
+
+        // Datenmodell für den Fragebogen
+        const questionnaireData = [
+            {
+                category: "Strategie",
+                questions: [
+                    { id: "1.1", text: "Unsere Unternehmensstrategie beinhaltet klare Ziele zur Nutzung von KI." },
+                    { id: "1.2", text: "Die Geschäftsleitung fördert aktiv KI-Initiativen und stellt die nötigen Mittel bereit." },
+                    { id: "1.3", text: "KI spielt in unserem Geschäftsmodell eine entscheidende Rolle für zukünftige Wettbewerbsfähigkeit." },
+                    { id: "1.4", text: "Unser Unternehmen ist generell schnell darin, neue Technologien und digitale Innovationen zu übernehmen." },
+                    { id: "1.5", text: "Wir beobachten aktiv Markttrends und die Konkurrenz in Bezug auf KI-Einsatz." }
+                ],
+            },
+            {
+                category: "Organisation",
+                questions: [
+                    { id: "2.1", text: "Unsere Mitarbeiter verfügen über die nötigen Fähigkeiten, um KI-Technologien einzuführen." },
+                    { id: "2.2", text: "Unser Unternehmen bietet ausreichend Schulungen an, um Kompetenzen im Bereich KI/Datenanalyse aufzubauen." },
+                    { id: "2.3", text: "Wir haben bereichsübergreifende Teams oder Projekte, die an KI-Themen arbeiten." },
+                    { id: "2.4", text: "Für KI-Projekte stehen in unserem Unternehmen genügend Ressourcen (Budget, Personal, Zeit) zur Verfügung." },
+                    { id: "2.5", text: "Wir haben eine zentrale Anlaufstelle oder einen Verantwortlichen für KI-Themen." },
+                    { id: "2.6", text: "Wir bieten Schutz- und Experimentierräume für Mitarbeitende um KI-Erfahrungen zu sammeln." },
+                    { id: "2.7", text: "Unser Unternehmen kann Veränderungsprozesse (wie die Einführung von KI) effektiv managen." }
+                ],
+            },
+            {
+                category: "Technik",
+                questions: [
+                    { id: "3.1", text: "Die IT-Infrastruktur in unserem Unternehmen (z.B. Rechenleistung, Cloud-Anbindung) ist für den Einsatz von KI ausgelegt." },
+                    { id: "3.2", text: "Wir haben die nötigen Tools und Technologien, um KI-Lösungen zu entwickeln und zu nutzen." },
+                    { id: "3.3", text: "Die Daten, die wir für KI-Anwendungen benötigen, sind in guter Qualität und einfach zugänglich." },
+                    { id: "3.4", text: "Wir haben eine Strategie zur Datenverwaltung, die auch die Nutzung für KI berücksichtigt." },
+                    { id: "3.5", text: "Wir nutzen Open-Source-Technologien und -Modelle zur Entwicklung von KI-Lösungen." },
+                    { id: "3.6", text: "In meinem Arbeitsbereich nutzen wir bereits KI-gestützte Tools oder Automatisierungen." },
+                    { id: "3.7", text: "Viele vormals manuelle Prozesse sind bei uns bereits (teil-)automatisiert worden." }
+                ],
+            },
+            {
+                category: "Kultur / Akzeptanz",
+                questions: [
+                    { id: "4.1", text: "Die Mitarbeiter in unserem Unternehmen sind offen für den Einsatz von neuen Technologien wie KI." },
+                    { id: "4.2", text: "In unserem Unternehmen gibt es eine ausgeprägte Innovationskultur, die Experimente mit KI fördert." },
+                    { id: "4.3", text: "Mitarbeiter sind aktiv in die Gestaltung von KI-Projekten eingebunden, um Akzeptanz und Vertrauen zu fördern." },
+                    { id: "4.4", text: "Der Einsatz von KI wird als Chance zur Verbesserung der eigenen Arbeit, nicht als Bedrohung, gesehen." },
+                    { id: "4.5", text: "Die Nutzung von KI-Systemen in unserer Organisation fällt mir leicht." },
+                    { id: "4.6", text: "Die Nutzung von KI-Systemen in unserer Organisation ist für die Anwender/noch zu komplex." },
+                    { id: "4.7", text: "Durch den Einsatz von KI kann ich meine Aufgaben schneller und effizienter erledigen." },
+                    { id: "4.8", text: "Ich finde, KI-Tools (z. B. Chatbots, Analyticstools) sind einfach zu erlernen und zu bedienen." },
+                    { id: "4.9", text: "Ich vertraue den Ergebnissen oder Entscheidungen, die KI-Systeme vorschlagen." },
+                    { id: "4.10", text: "Experimentieren mit neuen KI-Lösungen ist bei uns erwünscht, auch wenn mal Fehler passieren." },
+                    { id: "4.11", text: "Meine Kollegen und Vorgesetzten stehen KI-Technologien positiv gegenüber." },
+                    { id: "4.12", text: "Unsere Organisation ist hinsichtlich KI-Einführung..." },
+                    { id: "4.13", text: "Meine Organisation ist hinsichtlich dem Umgang mit neuen Technologien eher..." }
+                ],
+            },
+            {
+                category: "Regulatorik",
+                questions: [
+                    { id: "5.1", text: "Beim Einsatz von KI in unserem Unternehmen werden Datenschutz und Datensicherheit strikt beachtet." },
+                    { id: "5.2", text: "Unser Unternehmen hat klare Richtlinien oder Leitlinien für den ethischen Einsatz von KI." },
+                    { id: "5.3", text: "Unser Unternehmen fühlt sich gut auf zukünftige gesetzliche Anforderungen (z.B. EU AI Act) vorbereitet." },
+                    { id: "5.4", text: "Wir dokumentieren KI-Nutzung." },
+                    { id: "5.5", text: "Wir haben ein KI-Schulungsangebot für Mitarbeitende." },
+                    { id: "5.6", text: "Wir nutzen staatliche Förderprogramme oder externe Beratungsangebote, um KI bei uns einzuführen." }
+                ],
+            },
+            {
+                category: "Nutzung Quick Wins / KI-Potentiale",
+                questions: [
+                    { id: "6.1", text: "Ein großer Teil meiner Arbeitszeit geht für repetitive Routineaufgaben drauf, die meine eigentliche Arbeit aufhalten." },
+                    { id: "6.2", text: "Ich verbringe viel Zeit damit, Daten zu sammeln, aufzubereiten und auszuwerten, um Entscheidungen zu treffen." },
+                    { id: "6.3", text: "Benötigte Informationen (z.B. aus Dokumenten, Wissensdatenbanken) zu finden, ist bei uns mühsam und zeitintensiv." },
+                    { id: "6.4", text: "Wir haben viele sich wiederholende Anfragen (von Kunden oder intern), deren Bearbeitung viel Zeit bindet." },
+                    { id: "6.5", text: "In unseren Prozessen treten Fehler oder Qualitätsprobleme auf, die wir erst spät bemerken." },
+                ],
+            }
+        ];
+
+        // Datenmodell für die Handlungsempfehlungen, basierend auf der Kategorie und dem Reifegrad
+        const recommendations = {
+            "Strategie": {
+                "Awareness": "Definieren Sie klare KI-Ziele und integrieren Sie diese in die Unternehmensstrategie. Beginnen Sie mit der Erforschung der Wettbewerbslandschaft. Unternehmen mit einer explizit verankerten KI-Strategie zeigen einen höheren Reifegrad in organisatorischen und technischen Dimensionen.",
+                "Active": "Etablieren Sie ein dediziertes Budget und ein Team, um erste KI-Projekte zu starten. Die Geschäftsleitung sollte KI aktiv fördern, da das die Adoptionsbereitschaft im Unternehmen positiv beeinflusst.",
+                "Operational": "Führen Sie KI zur Optimierung bestehender Geschäftsprozesse und zur Effizienzsteigerung ein. Nutzen Sie erste Projekte als Proof of Concept. Führungskräfte sollten dabei langfristige Geschäftsmodell-Innovationen betonen.",
+                "Systemic": "Integrieren Sie KI als zentralen Wettbewerbsfaktor in Ihr Geschäftsmodell. Entwickeln Sie eine langfristige Vision für die KI-Nutzung, da dies den Reifegrad in organisatorischen und technischen Dimensionen erhöht.",
+                "Transformational": "Etablieren Sie eine KI-gestützte Kultur, die Innovationen im gesamten Unternehmen vorantreibt und neue Geschäftsmodelle ermöglicht. Dies führt zu einer höheren Anzahl an KI-Initiativen."
+            },
+            "Organisation": {
+                "Awareness": "Beginnen Sie mit der Identifizierung von Mitarbeitern, die ein Interesse an KI haben, und schaffen Sie ein grundlegendes Bewusstsein. Die Unterstützung durch Führungskräfte und ausreichende Ressourcen korrelieren positiv mit der KI-Adoptionsbereitschaft.",
+                "Active": "Bauen Sie erste abteilungsübergreifende Teams auf, die an Pilotprojekten arbeiten und definieren Sie klare Verantwortlichkeiten. Ein klarer organisatorischer Reifegrad steht in positiver Beziehung zum Umfang bestehender KI-Projekte.",
+                "Operational": "Führen Sie regelmäßige Schulungen und Workshops durch, um die KI-Kompetenzen der Mitarbeiter zu stärken und zu verbreiten. Dies ist essenziell für die Einführung von KI-Technologien. Schaffen Sie Schutz- und Experimentierräume, um erste Erfahrungen zu ermöglichen. Ein Unternehmen, das Veränderungsprozesse effektiv managen kann, wird einen höheren KI-Reifegrad erreichen.",
+                "Systemic": "Etablieren Sie eine zentrale KI-Kompetenzstelle und schaffen Sie klare Rollen und Strukturen für KI-Projekte. Die Adoptionsbereitschaft korreliert positiv mit der Unterstützung durch Führungskräfte und Trainings.",
+                "Transformational": "Schaffen Sie eine agile, lernende Organisation, die KI-Initiativen schnell umsetzen und skalieren kann, denn klare Verantwortlichkeiten und bereichsübergreifende Teams fördern den Umfang bestehender KI-Projekte."
+            },
+            "Technik": {
+                "Awareness": "Führen Sie eine Bestandsaufnahme Ihrer IT-Infrastruktur und Datenquellen durch. Die tatsächliche Nutzung von KI-Tools ist stark von der vorhandenen Infrastruktur und Datenqualität abhängig. Der Einsatz von KI-gestützten Tools und Automatisierungen ist ein wichtiger Schritt.",
+                "Active": "Starten Sie mit der Datenerfassung und der Aufbereitung kleiner, relevanter Datensätze. Die vorhandene IT-Infrastruktur und Datenqualität beeinflussen die Nutzung von KI-Tools stark. Die Automatisierung vormals manueller Prozesse ist ein Indikator für einen aktiven Reifegrad.",
+                "Operational": "Implementieren Sie erste Cloud-Dienste und KI-Plattformen zur Prozessautomatisierung. Sorgen Sie für eine verbesserte Datenqualität, da dies die Nutzung von KI-Tools direkt beeinflusst.",
+                "Systemic": "Etablieren Sie eine robuste Datenstrategie und schaffen Sie eine zentrale, zugängliche Datenplattform für KI-Anwendungen. Die vorhandene IT-Infrastruktur und Datenqualität sind entscheidend für die Nutzung von KI-Tools.",
+                "Transformational": "Setzen Sie auf skalierbare, voll integrierte KI-Infrastrukturen und nutzen Sie modernste Technologien wie MLOps, da die Nutzung von KI-Tools stark von der vorhandenen Infrastruktur und Datenqualität abhängt."
+            },
+            "Kultur / Akzeptanz": {
+                "Awareness": "Informieren Sie die Belegschaft über die Grundlagen der KI und schaffen Sie eine offene Diskussionskultur, um Ängste abzubauen. Eine innovationsfreundliche Unternehmenskultur geht mit einer höheren Anzahl laufender KI-Initiativen einher. Ein hohes Vertrauen der Mitarbeiter ist entscheidend für den flächendeckenden Einsatz.",
+                "Active": "Ermutigen Sie Mitarbeiter, mit einfachen KI-Tools zu experimentieren und Best Practices auszutauschen. Mitarbeiter mit hoher digitaler Kompetenz und Innovationsaffinität zeigen eine höhere Akzeptanz. Die Akzeptanz steigt, wenn KI-Systeme als einfach zu bedienen wahrgenommen werden.",
+                "Operational": "Binden Sie die Mitarbeiter aktiv in die Gestaltung von KI-Projekten ein, um Akzeptanz und Vertrauen zu fördern. Eine innovationsfreundliche Kultur fördert KI-Initiativen, was zu höherer Adoption führt. Das Vertrauen in KI-Systeme wächst durch positive Erfahrungen mit ihrer Nutzung.",
+                "Systemic": "Fördern Sie eine Kultur des kontinuierlichen Lernens und der Innovation, in der KI als Chance zur persönlichen Weiterentwicklung gesehen wird. Mitarbeiter mit hoher digitaler Kompetenz zeigen eine höhere Akzeptanz für KI und nutzen sie, um Aufgaben schneller und effizienter zu erledigen.",
+                "Transformational": "KI-Kompetenz und eine datengesteuerte Denkweise sind zu einem integralen Bestandteil der Unternehmenskultur geworden. Das Vertrauen in KI-Systeme ist hoch und die Nutzung fällt den Mitarbeitern leicht."
+            },
+            "Regulatorik": {
+                "Awareness": "Beginnen Sie mit der Sensibilisierung für Datenschutz- und Sicherheitsrichtlinien im Zusammenhang mit KI und schaffen Sie eine grundlegende Policy. Unternehmen mit bestehenden Richtlinien zu Datenschutz und KI-Ethik haben häufiger produktive KI-Anwendungen in Betrieb.",
+                "Active": "Führen Sie erste interne Richtlinien für den verantwortungsvollen und ethischen Einsatz von KI ein, da Unternehmen mit bestehenden Richtlinien häufiger produktive KI-Anwendungen haben.",
+                "Operational": "Etablieren Sie Prozesse zur systematischen Dokumentation der KI-Nutzung und zur Einhaltung rechtlicher Vorgaben (z.B. DSGVO). Dies ermöglicht den produktiven Einsatz von KI-Anwendungen.",
+                "Systemic": "Ernennen Sie einen 'KI-Ethik-Beauftragten' und bereiten Sie sich aktiv auf zukünftige Gesetze wie den EU AI Act vor. Dies ist eine Voraussetzung für den produktiven Betrieb von KI-Anwendungen.",
+                "Transformational": "Ethik und Compliance sind fest in allen KI-Prozessen verankert und dienen als Wettbewerbsvorteil, nicht nur als Pflicht. Unternehmen mit solchen Richtlinien haben häufiger produktive KI-Anwendungen in Betrieb."
+            },
+            "Nutzung Quick Wins / KI-Potentiale": {
+                "Awareness": "Führen Sie Workshops durch, um manuelle, repetitive Aufgaben zu identifizieren, die durch KI automatisiert werden könnten, denn monotone Aufgaben werden oft als größte Pain Points genannt. Der wahrgenommene Nutzen hängt zudem positiv mit der Nutzungsabsicht zusammen.",
+                "Active": "Starten Sie ein Pilotprojekt zur Automatisierung eines einzelnen, zeitintensiven Prozesses, um dessen Potenzial zu demonstrieren. Wahrgenommener Nutzen hängt positiv mit der Nutzungsabsicht zusammen.",
+                "Operational": "Setzen Sie KI-Lösungen ein, um die Qualität in Schlüsselprozessen zu verbessern und Fehler systematisch zu reduzieren. Der wahrgenommene Nutzen hängt positiv mit der Nutzungsabsicht zusammen.",
+                "Systemic": "Nutzen Sie KI zur systematischen Optimierung der Entscheidungsfindung und zur Automatisierung von Kundenanfragen. Wiederkehrende Anfragen sind größte Pain Points und haben hohes Automatisierungspotenzial.",
+                "Transformational": "KI wird zur Generierung neuer Geschäftsmodelle und zur Schaffung transformativer Produkte und Dienstleistungen eingesetzt. Der wahrgenommene Nutzen hängt positiv mit der Nutzungsabsicht zusammen."
+            }
+        };
+
+
+        // Zustand (State) zur Speicherung der Benutzereingaben
+        const userAnswers = {};
+
+        // Verweis auf die HTML-Elemente
+        const questionnaireContainer = document.getElementById('questionnaire-container');
+        const scoresContainer = document.getElementById('scores-container');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const totalScoreElement = document.getElementById('total-score');
+        const downloadPdfBtn = document.getElementById('download-pdf-btn');
+        const messageBox = document.getElementById('message-box');
+        const messageTitle = document.getElementById('message-title');
+        const messageBody = document.getElementById('message-body');
+        const resultsSection = document.getElementById('results-section');
+        const insightsContainer = document.getElementById('insights-container');
+        const insightsList = document.getElementById('insights-list');
+        const radarCanvas = document.getElementById('radarChart');
+        const contactInfo = document.getElementById('contact-info');
+        const finalResultsContainer = document.getElementById('final-results-container');
+        const finalResultsList = document.getElementById('final-results-list');
+
+        // Neue Elemente für die Reifegrad-Skala und Empfehlungen
+        const maturityIndicator = document.getElementById('maturity-indicator');
+        const maturityLevelText = document.getElementById('maturity-level-text');
+
+        // Definition der Stufen des Gartner AI Maturity Model
+        const maturityLevels = [
+            { level: 1, name: "Awareness", min: 0, max: 20, color: "border-red-500" },
+            { level: 2, name: "Active", min: 21, max: 40, color: "border-orange-500" },
+            { level: 3, name: "Operational", min: 41, max: 60, color: "border-green-500" },
+            { level: 4, name: "Systemic", min: 61, max: 80, color: "border-blue-500" },
+            { level: 5, name: "Transformational", min: 81, max: 100, color: "border-custom-red" },
+        ];
+        
+        // Farben für die Tachometeranzeige
+        // Die Farbe für die "Transformational"-Stufe wurde auf Rot geändert
+        const gaugeColors = {
+            'Awareness': '#ef4444',
+            'Active': '#f97316',
+            'Operational': '#22c55e',
+            'Systemic': '#3b82f6',
+            'Transformational': '#C9133B'
+        };
+
+        // Die 5 Text-Labels für den Schieberegler
+        const sliderLabels = ["Nein", "eher nein", "teilweise", "eher ja", "Ja"];
+        const customSliderLabels = {
+            '4.12': ['konservativ', '', '', '', 'innovativ'],
+            '4.13': ['reaktiv', '', '', '', 'proaktiv']
+        };
+
+        // Die Pain Point-Hypothesen mit ihren KI-Einsatzmöglichkeiten
+        const painPoints = [
+            { id: "6.1", text: "Ein großer Teil meiner Arbeitszeit geht für repetitive Routineaufgaben drauf, die meine eigentliche Arbeit aufhalten.", solution: "Automatisierungspotenzial: Hohe Werte deuten auf Bedarf für RPA/KI-Automatisierung hin." },
+            { id: "6.2", text: "Ich verbringe viel Zeit damit, Daten zu sammeln, aufzubereiten und auszuwerten, um Entscheidungen zu treffen.", solution: "Pain Point: Analytics – Hohe Werte zeigen Bedarf für KI-gestützte Datenanalyse/BI-Tools." },
+            { id: "6.3", text: "Benötigte Informationen (z.B. aus Dokumenten, Wissensdatenbanken) zu finden, ist bei uns mühsam und zeitintensiv.", solution: "Pain Point: Knowledge Management – KI wie NLP/Chatbots könnte hier helfen." },
+            { id: "6.4", text: "Wir haben viele sich wiederholende Anfragen (von Kunden oder intern), deren Bearbeitung viel Zeit bindet.", solution: "Pain Point: Kundenservice/Helpdesk – KI-Chatbots oder Assistenzsysteme könnten entlasten." },
+            { id: "6.5", text: "In unseren Prozessen treten Fehler oder Qualitätsprobleme auf, die wir erst spät bemerken.", solution: "Pain Point: Qualitätssicherung – KI zur Anomalieerkennung/vorausschauenden Qualitätssicherung denkbar." },
+        ];
+        
+        // Die abschließenden Fragen
+        const finalQuestions = [
+            { id: "G1", text: "Gesamtreife Selbsteinschätzung: „Unser Unternehmen ist insgesamt bereit für den flächendeckenden Einsatz von KI.“" },
+            { id: "G2", text: "Nutzungsintention (Employee): „Wenn in meinem Arbeitsbereich KI-Tools verfügbar sind, werde ich diese aktiv nutzen.“" },
+            { id: "G3", text: "Unterstützungserwartung: „Ich wünsche mir in der kommenden Zeit Unterstützung (z. B. Beratung, Schulung), um KI erfolgreich in meiner Arbeit einsetzen zu können.“" }
+        ];
+
+
+        /**
+         * Zeigt eine benutzerdefinierte Meldungsbox an.
+         * Ersetzt standardmäßiges alert().
+         * @param {string} title Der Titel der Nachricht.
+         * @param {string} body Der Text der Nachricht.
+         */
+        function showMessage(title, body) {
+            messageTitle.textContent = title;
+            messageBody.textContent = body;
+            messageBox.classList.remove('hidden');
+            messageBox.classList.add('flex');
+        }
+
+        /**
+         * Rendert den Fragebogen dynamisch auf Basis der Daten.
+         */
+        function renderQuestionnaire() {
+            questionnaireData.forEach(category => {
+                const categorySection = document.createElement('div');
+                categorySection.className = 'mb-8 p-6 bg-gray-50 rounded-lg';
+                categorySection.innerHTML = `
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">${category.category}</h2>
+                    <div class="space-y-4"></div>
+                `;
+                const questionsList = categorySection.querySelector('div.space-y-4');
+
+                let questionsToRender = category.questions;
+                
+                questionsToRender.forEach(question => {
+                    const questionDiv = document.createElement('div');
+                    questionDiv.className = 'p-4 bg-white rounded-lg shadow-sm';
+                    
+                    const questionText = document.createElement('p');
+                    questionText.className = 'font-medium text-gray-700 mb-2';
+                    questionText.textContent = `${question.id}. ${question.text}`;
+                    
+                    const sliderContainer = document.createElement('div');
+                    sliderContainer.className = 'slider-container';
+
+                    const slider = document.createElement('input');
+                    slider.type = 'range';
+                    slider.id = `question-${question.id}`;
+                    slider.min = '0';
+                    slider.max = '4';
+                    slider.step = '1';
+                    // Stellt den Standardwert basierend auf den gespeicherten Antworten ein
+                    const savedValue = userAnswers[question.id] !== undefined ? userAnswers[question.id] : 2; // Default to "teilweise" (50%)
+                    slider.value = savedValue;
+                    
+                    const labelsContainer = document.createElement('div');
+                    labelsContainer.className = 'slider-labels-container';
+                    
+                    const currentLabels = customSliderLabels[question.id] || sliderLabels;
+                    currentLabels.forEach(label => {
+                        const span = document.createElement('span');
+                        span.textContent = label;
+                        labelsContainer.appendChild(span);
+                    });
+                    
+                    sliderContainer.appendChild(slider);
+                    sliderContainer.appendChild(labelsContainer);
+                    
+                    const questionOptionContainer = document.createElement('div');
+                    questionOptionContainer.className = 'question-option-container';
+                    questionOptionContainer.appendChild(sliderContainer);
+
+                    questionDiv.appendChild(questionText);
+                    questionDiv.appendChild(questionOptionContainer);
+                    questionsList.appendChild(questionDiv);
+                });
+                
+                questionnaireContainer.appendChild(categorySection);
+            });
+        }
+        
+        /**
+         * Rendert die abschließenden Fragen
+         */
+        function renderFinalQuestions() {
+            // No longer rendering this section
+        }
+
+        /**
+         * Fügt Event-Listener für Interaktionen hinzu.
+         */
+        function attachEventListeners() {
+            questionnaireContainer.addEventListener('input', (event) => {
+                if (event.target.type === 'range') {
+                    const questionId = event.target.id.replace('question-', '');
+                    userAnswers[questionId] = parseInt(event.target.value, 10);
+                } else if (event.target.id === 'question-G4') {
+                    userAnswers['G4'] = event.target.value;
+                }
+            });
+            
+            calculateBtn.addEventListener('click', calculateScores);
+            downloadPdfBtn.addEventListener('click', generatePDF);
+        }
+
+        /**
+         * Aktualisiert die visuelle Reifegrad-Skala basierend auf dem Gesamtscore.
+         * @param {number} score Der berechnete prozentuale Gesamtscore.
+         */
+        function updateMaturityScale(score) {
+            // Position des Indikators von 0% bis 100%
+            let position = Math.max(0, Math.min(100, score));
+            maturityIndicator.style.left = `${position}%`;
+
+            // Findet die passende Reifegrad-Stufe
+            const currentLevel = maturityLevels.find(level => score >= level.min && score <= level.max);
+            
+            // Aktualisiert den Text und die Farbe des Indikators
+            if (currentLevel) {
+                maturityLevelText.textContent = `Level ${currentLevel.level}: ${currentLevel.name}`;
+                maturityIndicator.className = `indicator ${currentLevel.color}`;
+            } else {
+                maturityLevelText.textContent = `Level nicht definiert`;
+            }
+        }
+        
+        /**
+         * Zeigt die Handlungsempfehlungen basierend auf den Kategorie-Scores an.
+         * @param {Object} categoryScores Ein Objekt mit Kategorie-Namen und den prozentualen Scores.
+         */
+        function displayInsights(categoryScores) {
+            insightsList.innerHTML = '';
+            insightsContainer.classList.remove('hidden');
+
+            for (const category in categoryScores) {
+                const score = categoryScores[category];
+                
+                // Findet die Reifegrad-Stufe für den aktuellen Kategorie-Score
+                const currentLevel = maturityLevels.find(level => score >= level.min && score <= level.max);
+                
+                let insightText = "Keine Empfehlung verfügbar.";
+                if (currentLevel && recommendations[category]) {
+                    // Wählt die passende Empfehlung aus dem Datenmodell
+                    insightText = recommendations[category][currentLevel.name] || insightText;
+                }
+                
+                // Erstellt das HTML-Element für die Empfehlung
+                const insightDiv = document.createElement('div');
+                insightDiv.className = 'p-4 bg-white rounded-lg shadow-md';
+                insightDiv.innerHTML = `
+                    <h3 class="font-semibold text-gray-800 text-lg mb-1">${category}</h3>
+                    <p class="text-sm text-gray-600">${insightText}</p>
+                `;
+                insightsList.appendChild(insightDiv);
+            }
+        }
+        
+        /**
+         * Gibt die Farbe für einen Score-Wert zurück, basierend auf den Gartner-Stufen.
+         * @param {number} score Der prozentuale Score.
+         * @returns {string} Die entsprechende Hex-Farbe.
+         */
+        function getGaugeColor(score) {
+            if (score <= 20) return '#ef4444'; // Red
+            if (score <= 40) return '#f97316'; // Orange
+            if (score <= 60) return '#22c55e'; // Green
+            if (score <= 80) return '#3b82f6'; // Blue
+            // Die Farbe für die "Transformational"-Stufe wurde auf Rot geändert
+            return '#C9133B'; 
+        }
+
+        /**
+         * Rendert die individuellen Tacho-Anzeigen für jede Dimension.
+         * @param {Object} categoryScores Ein Objekt mit Kategorie-Namen und den prozentualen Scores.
+         */
+        function renderGauges(categoryScores) {
+            let scoresHtml = '';
+            for (const category in categoryScores) {
+                const score = categoryScores[category];
+                const gaugeColor = getGaugeColor(score);
+
+                scoresHtml += `
+                    <div class="bg-white rounded-lg p-4 shadow-sm">
+                        <p class="font-medium text-gray-800 mb-2">${category}</p>
+                        <div class="gauge-bar-container">
+                            <div class="gauge-bar" style="width: ${score.toFixed(1)}%; background-color: ${gaugeColor};"></div>
+                        </div>
+                        <p class="text-xl font-bold text-gray-900 mt-2">${score.toFixed(1)}%</p>
+                    </div>
+                `;
+            }
+            scoresContainer.innerHTML = scoresHtml;
+        }
+
+        /**
+         * Rendert das Radar-Chart.
+         * @param {Array<string>} labels Die Namen der Kategorien.
+         * @param {Array<number>} data Die prozentualen Scores.
+         */
+        function renderRadarChart(labels, data) {
+            const ctx = radarCanvas.getContext('2d');
+            if (myRadarChart) {
+                myRadarChart.destroy();
+            }
+
+            myRadarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'KI-Reifegrad',
+                        data: data,
+                        // Die Farben wurden auf Rot geändert
+                        backgroundColor: 'rgba(201, 19, 59, 0.2)',
+                        borderColor: 'rgba(201, 19, 59, 1)',
+                        pointBackgroundColor: 'rgba(201, 19, 59, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(201, 19, 59, 1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: true
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 100,
+                            ticks: {
+                                backdropColor: 'rgba(255, 255, 255, 0.75)',
+                                color: '#4b5563'
+                            },
+                            pointLabels: {
+                                font: {
+                                    size: 14
+                                },
+                                color: '#374151'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        /**
+         * Rendert die Ergebnisse der abschließenden Fragen
+         */
+        function renderFinalResults() {
+            // No longer rendering this section
+        }
+
+        /**
+         * Erstellt ein PDF-Dokument mit den Analyseergebnissen.
+         */
+        function generatePDF() {
+            // Ensure results are calculated before generating PDF
+            calculateScores();
+
+            const doc = new window.jspdf.jsPDF();
+            const canvas = document.getElementById('pdf-content');
+            const firmaName = document.getElementById('firma').value || 'Unbekannte Firma';
+            
+            // Temporarily show hidden elements for PDF rendering
+            resultsSection.classList.remove('hidden');
+            insightsContainer.classList.remove('hidden');
+            contactInfo.classList.remove('hidden');
+
+
+            // Give Chart.js some time to render the canvas content
+            setTimeout(() => {
+                html2canvas(canvas, {
+                    scale: 2,
+                    useCORS: true
+                }).then(canvasImage => {
+                    const imgData = canvasImage.toDataURL('image/png');
+                    const imgWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const imgHeight = canvasImage.height * imgWidth / canvasImage.width;
+                    let heightLeft = imgHeight;
+
+                    let position = 0;
+
+                    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+
+                    while (heightLeft >= 0) {
+                        position = heightLeft - imgHeight;
+                        doc.addPage();
+                        doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                        heightLeft -= pageHeight;
+                    }
+
+                    doc.save(`KI-Reifegradanalyse_${firmaName}.pdf`);
+
+                    // Hide elements again after PDF generation
+                    resultsSection.classList.add('hidden');
+                    insightsContainer.classList.add('hidden');
+                    contactInfo.classList.add('hidden');
+                }).catch(error => {
+                    console.error('Error generating PDF:', error);
+                    showMessage('PDF-Fehler', 'Es gab ein Problem beim Generieren des PDFs. Bitte versuchen Sie es erneut.');
+                });
+            }, 500); // 500ms delay to ensure all charts are rendered
+        }
+
+
+        /**
+         * Berechnet die Scores und aktualisiert die Benutzeroberfläche.
+         */
+        function calculateScores() {
+            // Stellt sicher, dass alle Schieberegler einen Wert im userAnswers-Objekt haben.
+            const allQuestions = questionnaireData.flatMap(cat => cat.questions);
+
+            allQuestions.forEach(question => {
+                const sliderId = `question-${question.id}`;
+                const sliderElement = document.getElementById(sliderId);
+                // Check if the element exists and is a range input before setting the default value.
+                if (sliderElement && sliderElement.type === 'range' && userAnswers[question.id] === undefined) {
+                    userAnswers[question.id] = parseInt(sliderElement.value, 10);
+                } else if (sliderElement && sliderElement.type === 'textarea') {
+                    userAnswers[question.id] = sliderElement.value;
+                }
+            });
+
+            // Die Berechnung des Gesamtscores basiert nur auf den Hauptkategorien (Strategie bis Potentiale)
+            let totalPercentageScore = 0;
+            let categoriesWithScores = 0;
+            const categoryScores = {};
+            const radarLabels = [];
+            const radarData = [];
+            
+            // Map the questions for each category for a better data structure
+            const categoriesMap = new Map();
+            questionnaireData.forEach(cat => categoriesMap.set(cat.category, cat.questions));
+
+            // Berechnung der Scores pro Kategorie
+            categoriesMap.forEach((questions, categoryName) => {
+                let categoryScore = 0;
+                let maxCategoryScore = questions.length;
+                
+                questions.forEach(question => {
+                    const sliderValue = userAnswers[question.id] || 0;
+                    
+                    // Umgekehrte Logik für die Kategorie "Nutzung Quick Wins / KI-Potentiale"
+                    if (categoryName === "Nutzung Quick Wins / KI-Potentiale") {
+                        categoryScore += (4 - sliderValue) / 4;
+                    } else {
+                        categoryScore += sliderValue / 4;
+                    }
+                });
+
+                const categoryPercentage = (categoryScore / maxCategoryScore) * 100;
+                categoryScores[categoryName] = categoryPercentage;
+                
+                totalPercentageScore += categoryPercentage;
+                categoriesWithScores++;
+
+                radarLabels.push(categoryName);
+                radarData.push(categoryPercentage.toFixed(1));
+            });
+            
+            const averageTotalScore = totalPercentageScore / categoriesWithScores;
+
+            // Update UI
+            renderGauges(categoryScores);
+            totalScoreElement.textContent = `${averageTotalScore.toFixed(1)}%`;
+            updateMaturityScale(averageTotalScore);
+            displayInsights(categoryScores);
+            renderRadarChart(radarLabels, radarData);
+            
+            // Show result sections and PDF download button
+            resultsSection.classList.remove('hidden');
+            insightsContainer.classList.remove('hidden');
+            downloadPdfBtn.classList.remove('hidden');
+
+            // Send data to backend
+            sendToBackend(categoryScores, averageTotalScore);
+        }
+
+        /**
+         * Get the recommendation level based on score
+         * @param {number} score - The score from 0 to 100
+         * @returns {string} - The maturity level name
+         */
+        function getRecommendationLevel(score) {
+            const currentLevel = maturityLevels.find(level => score >= level.min && score <= level.max);
+            return currentLevel ? currentLevel.name : "Awareness";
+        }
+
+        async function sendToBackend(categoryScores, totalScore) {
+            console.log('===== SENDING DATA TO BACKEND =====');
+            console.log('Total Score:', totalScore);
+            console.log('Category Scores:', categoryScores);
+
+            // Get maturity level
+            const currentLevel = maturityLevels.find(level => totalScore >= level.min && totalScore <= level.max);
+            const maturityLevel = currentLevel ? currentLevel.name : "Not defined";
+            console.log('Maturity Level:', maturityLevel);
+
+            // Get insights
+            const insights = {};
+            for (const [category, score] of Object.entries(categoryScores)) {
+                const level = getRecommendationLevel(score);
+                if (recommendations[category] && recommendations[category][level]) {
+                    insights[category] = recommendations[category][level];
+                }
+            }
+            console.log('Insights:', insights);
+
+            // Get contact info if available
+            const contactInfo = {};
+            const nameInput = document.querySelector('input[placeholder*="Name"]');
+            const emailInput = document.querySelector('input[placeholder*="E-Mail"]');
+            const phoneInput = document.querySelector('input[placeholder*="Telefon"]');
+            const companyInput = document.querySelector('input[placeholder*="Unternehmen"]');
+
+            if (nameInput && nameInput.value) contactInfo.name = nameInput.value;
+            if (emailInput && emailInput.value) contactInfo.email = emailInput.value;
+            if (phoneInput && phoneInput.value) contactInfo.phone = phoneInput.value;
+            if (companyInput && companyInput.value) contactInfo.company = companyInput.value;
+            console.log('Contact Info:', contactInfo);
+
+            const data = {
+                scores: categoryScores,
+                totalScore: totalScore,
+                maturityLevel: maturityLevel,
+                insights: insights,
+                contactInfo: Object.keys(contactInfo).length > 0 ? contactInfo : null,
+                userAnswers: userAnswers
+            };
+
+            console.log('Full data payload:', JSON.stringify(data, null, 2));
+
+            try {
+                console.log('Sending POST request to http://localhost:8000/api/submit-assessment');
+                const response = await fetch('http://localhost:8000/api/submit-assessment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('✅ Assessment sent successfully:', result);
+                    showMessage('Erfolg', 'Die Ergebnisse wurden erfolgreich per E-Mail versendet!');
+                } else {
+                    const errorText = await response.text();
+                    console.error('❌ Failed to send assessment. Status:', response.status);
+                    console.error('Error response:', errorText);
+                    showMessage('Fehler', `Die Ergebnisse konnten nicht versendet werden. Status: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('❌ Error sending assessment:', error);
+                console.error('Error details:', error.message);
+                showMessage('Fehler', 'Verbindung zum Server fehlgeschlagen. Die Ergebnisse konnten nicht versendet werden.');
+            }
+            console.log('===== END SENDING DATA =====');
+        }
+
+        // Initialisierung der App beim Laden der Seite
+        window.onload = function() {
+            renderQuestionnaire();
+            attachEventListeners();
+        };
+
+    </script>
+</body>
+</html>

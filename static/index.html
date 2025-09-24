@@ -1740,15 +1740,8 @@ function hideMessage() {
   messageBox.classList.remove('show');
 }
 
-// Init
-document.addEventListener('DOMContentLoaded', async () => {
-  renderMcq();
-  renderLikert();
-  await loadDebugMode();
-});
-
 // Bind progress and enable/disable logic
-(function initUX(){
+function initUX(){
   function answeredMcqCount(){
     let cnt = 0;
     MCQ_DIMENSIONS.forEach(dim => {
@@ -1806,7 +1799,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (firmaEl) firmaEl.addEventListener('input', updateProgress);
   // Init
   updateProgress();
-})();
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', async () => {
+  renderMcq();
+  renderLikert();
+  await loadDebugMode();
+  initUX(); // Initialize progress tracking after DOM is ready
+});
 </script>
 </body>
 </html>

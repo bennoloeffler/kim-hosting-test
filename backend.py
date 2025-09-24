@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 # Load .env file (will NOT override existing shell environment variables)
 load_dotenv(override=False)
 
+# Load debug mode configuration
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').lower() in ['true', '1', 'yes']
+
 logger.info("=" * 80)
 logger.info("BACKEND STARTUP")
 logger.info("=" * 80)
@@ -28,6 +31,7 @@ logger.info("Using Microsoft Exchange OAuth for email")
 logger.info("Environment variable sources:")
 logger.info("  - Shell environment variables take precedence")
 logger.info("  - .env file used as fallback")
+logger.info(f"DEBUG_MODE: {DEBUG_MODE}")
 logger.info(f"EWS_SENDER_ADDRESS: {os.getenv('EWS_SENDER_ADDRESS', 'Not set')}")
 logger.info(f"EWS_RECIPIENT_ADDRESS: {os.getenv('EWS_RECIPIENT_ADDRESS', 'Not set')}")
 logger.info(f"EWS_CLIENT_ID: {os.getenv('EWS_CLIENT_ID', 'Not set')}")
@@ -47,6 +51,11 @@ app.add_middleware(
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/api/debug-mode")
+async def get_debug_mode():
+    """Return the current debug mode status"""
+    return {"debug_mode": DEBUG_MODE}
 
 class AssessmentData(BaseModel):
     scores: Dict[str, float]

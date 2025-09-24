@@ -227,8 +227,13 @@
     <img alt="V&S Logo" src="https://v-und-s.de/wp-content/uploads/2021/11/VS_25_Jahre_Logo_RGB_RZ-300x198.png" class="absolute top-3 right-3 h-12 sm:top-6 sm:right-6 sm:h-20 md:h-24"/>
     <div class="text-center mb-10">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">KI-Reifegrad – Service Excellence</h1>
-      <p class="text-gray-600 text-sm sm:text-base"><b>360° Grad KI- Integration - Von Strategie bis Technologie</b> <br>
-Erkennen Sie Ihre Stärken und Potenziale im KI-Reifegrad – übersichtlich in Score und Spidergrafik.</p>
+      <p class="text-gray-600 text-sm sm:text-base"><b>360° Grad KI-Integration - Von Strategie bis Technologie</b> <br>
+Erkennen Sie Ihre Stärken und Potenziale im KI-Reifegrad – übersichtlich dargestellt als Chart.</p>
+    </div>
+
+    <!-- Debug banner when in debug mode -->
+    <div id="debug-banner" style="display:none; background:#fef3c7; border:2px solid #f59e0b; padding:12px; margin:20px; border-radius:8px; text-align:center;">
+      <strong>⚠️ DEBUG MODE ACTIVE</strong> - PDF generation without complete data is enabled
     </div>
 
     <!-- Sticky Progress Bar -->
@@ -317,6 +322,72 @@ Erkennen Sie Ihre Stärken und Potenziale im KI-Reifegrad – übersichtlich in 
   </div>
 
 <script>
+// ---------- Global Variables ----------
+
+// Global debug mode flag
+let DEBUG_MODE = false;
+
+// ---------- Debug Mode Functions ----------
+
+// Fetch debug mode from backend
+async function loadDebugMode() {
+  try {
+    const response = await fetch('/api/debug-mode');
+    const data = await response.json();
+    DEBUG_MODE = data.debug_mode;
+    if (DEBUG_MODE) {
+      console.warn('🔧 DEBUG MODE ENABLED - PDF generation without complete data allowed');
+      // Show debug banner
+      const banner = document.getElementById('debug-banner');
+      if (banner) banner.style.display = 'block';
+
+      // Update button states after debug mode is loaded
+      if (window.updateProgress) {
+        window.updateProgress();
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load debug mode:', e);
+  }
+}
+
+// Fill missing form data with defaults for testing
+function fillDebugDefaults() {
+  console.log('DEBUG: Auto-filling missing form data');
+
+  // Fill MCQ dimensions with middle values
+  MCQ_DIMENSIONS.forEach(dim => {
+    const existing = document.querySelector(`input[name="mcq-${dim.key}"]:checked`);
+    if (!existing) {
+      const midOption = Math.ceil(dim.options.length / 2);
+      const radio = document.querySelector(`input[name="mcq-${dim.key}"][value="${midOption}"]`);
+      if (radio) {
+        radio.checked = true;
+        console.log(`DEBUG: Set ${dim.key} to option ${midOption}`);
+      }
+    }
+  });
+
+  // Fill Likert scales with middle value (3)
+  LIKERT_GROUPS.forEach(grp => {
+    grp.items.forEach((q, idx) => {
+      const slider = document.querySelector(`input[name="likert-${grp.key}-${idx}"]`);
+      if (slider && slider.dataset.touched !== 'true') {
+        slider.value = 3;
+        slider.dataset.touched = 'true';
+        slider.classList.add('touched');
+        console.log(`DEBUG: Set likert-${grp.key}-${idx} to 3`);
+      }
+    });
+  });
+
+  // Fill name if empty
+  const nameField = document.getElementById('name');
+  if (nameField && !nameField.value) {
+    nameField.value = 'Test User (DEBUG)';
+  }
+}
+
 // ---------- Data ----------
 
 // MCQ (Stufe 1–5) pro Dimension – exakt eine Antwort pro Dimension
@@ -841,10 +912,19 @@ function gartnerFromPercent(p) {
 
 function calculate() {
   const firmaVal = (document.getElementById('firma')?.value || '').trim();
-  if (!firmaVal) {
+
+  // In debug mode, use default firma if not provided
+  if (DEBUG_MODE && !firmaVal) {
+    document.getElementById('firma').value = 'TEST COMPANY (DEBUG)';
+  } else if (!firmaVal) {
     showMessage('Fehler', 'Bitte geben Sie den Firmennamen an.');
     document.getElementById('firma')?.focus();
     return;
+  }
+
+  // In debug mode, fill missing data with defaults
+  if (DEBUG_MODE) {
+    fillDebugDefaults();
   }
 
   const dimPercents = {};
@@ -879,7 +959,7 @@ function calculate() {
     groupBuckets.set(grp.key, [percent]);
   });
 
-  if (!allAnswered) {
+  if (!allAnswered && !DEBUG_MODE) {
     showMessage('Fehler', 'Bitte beantworten Sie alle Fragen.');
     return;
   }
@@ -1073,6 +1153,12 @@ async function sendToBackend(categoryScores, totalScore, maturityInfo) {
 // ---------- Data Collection / Export ----------
 
 function collectData(requireAll=true) {
+  // Override requireAll if in debug mode
+  if (DEBUG_MODE && requireAll) {
+    console.log('DEBUG_MODE: Bypassing data validation');
+    requireAll = false;
+  }
+
   const name = (document.getElementById('name')?.value || '').trim();
   const firma = (document.getElementById('firma')?.value || '').trim();
   let allAnswered = true;
@@ -1179,7 +1265,7 @@ function generateExcel(data) {
   XLSX.writeFile(wb, `auswertung_${safeName}_${Date.now()}.xlsx`);
 }
 
-// Generate PDF
+// Generate Premium PDF
 async function generatePdf(data) {
   const { jsPDF } = window.jspdf || {};
   if (!jsPDF) {
@@ -1188,17 +1274,45 @@ async function generatePdf(data) {
   }
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
-  const marginX = 40;
+  // Premium spacing and typography settings
+  const marginX = 60; // Increased margins for premium look
   const pageWidth = doc.internal.pageSize.getWidth();
   const contentW = pageWidth - marginX * 2;
   const pageH = doc.internal.pageSize.getHeight();
-  const bottomY = pageH - 40;
-  const line = 14;
+  const bottomY = pageH - 60; // Increased bottom margin
+
+  // Typography scale
+  const typography = {
+    hero: 26,
+    title: 18,
+    subtitle: 14,
+    body: 12,
+    small: 10,
+    tiny: 9
+  };
+
+  // Spacing system
+  const spacing = {
+    xl: 50,
+    lg: 40,
+    md: 30,
+    sm: 20,
+    xs: 15,
+    xxs: 10
+  };
+
+  let currentPage = 1;
   const newPageIfNeeded = (y, extra = 0) => {
-    if (y + extra > bottomY) { doc.addPage(); return 60; }
+    if (y + extra > bottomY) {
+      doc.addPage();
+      currentPage++;
+      addPageFooter(currentPage);
+      return 80; // Start position on new page
+    }
     return y;
   };
 
+  // Color palette
   const brandHex = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#C9133B';
   const hexToRgb = (hex) => {
     const h = hex.replace('#','');
@@ -1211,116 +1325,344 @@ async function generatePdf(data) {
   };
   const brandRgb = hexToRgb(brandHex);
 
-  // Header banner
-  const headerHeight = 90;
+  // Extended color palette
+  const colors = {
+    brand: brandRgb,
+    dark: { r: 31, g: 41, b: 55 },
+    gray: { r: 107, g: 114, b: 128 },
+    lightGray: { r: 156, g: 163, b: 175 },
+    bgLight: { r: 248, g: 250, b: 252 },
+    bgCard: { r: 252, g: 252, b: 253 },
+    border: { r: 229, g: 231, b: 235 },
+    success: { r: 34, g: 197, b: 94 },
+    warning: { r: 249, g: 115, b: 22 },
+    danger: { r: 239, g: 68, b: 68 },
+    blue: { r: 59, g: 130, b: 246 },
+    purple: { r: 124, g: 58, b: 237 }
+  };
+
+  // Helper function for score colors - use dark color for clean design
+  const getScoreColor = (score) => {
+    return colors.dark; // Always use dark gray/black for clean design
+  };
+
+  // Add page footer helper
+  const addPageFooter = (pageNum) => {
+    doc.setFontSize(typography.tiny);
+    doc.setTextColor(colors.lightGray.r, colors.lightGray.g, colors.lightGray.b);
+    doc.text(`Seite ${pageNum}`, pageWidth / 2, pageH - 30, { align: 'center' });
+    doc.setDrawColor(colors.border.r, colors.border.g, colors.border.b);
+    doc.setLineWidth(0.5);
+    doc.line(marginX, pageH - 45, pageWidth - marginX, pageH - 45);
+  };
+
+  // Premium header with gradient effect
+  const headerHeight = 120;
+
+  // Main header rectangle
   doc.setFillColor(brandRgb.r, brandRgb.g, brandRgb.b);
   doc.rect(0, 0, pageWidth, headerHeight, 'F');
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(20);
+
+  // Add subtle gradient overlay with transparency
+  //doc.setFillColor(255, 255, 255);
+  //doc.setGState(new doc.GState({ opacity: 0.1 }));
+  //doc.rect(0, 0, pageWidth, headerHeight / 2, 'F');
+  //doc.setGState(new doc.GState({ opacity: 1 }));
+
+  // Header content
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(typography.hero);
   doc.setTextColor(255, 255, 255);
-  doc.text('KI-Reifegrad – Service im Maschinenbau', marginX, 42);
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(11);
-  let headerInfoY = 60;
-  doc.text(`Firma: ${data.firma}`, marginX, headerInfoY);
-  if (data.name) {
-    headerInfoY += 14;
-    doc.text(`Name: ${data.name}`, marginX, headerInfoY);
+  doc.text('KI-Reifegrad Analyse', marginX, 45);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(typography.subtitle);
+  doc.text('KI & Service-Excellence', marginX, 68);
+
+  // Header info with better layout
+  doc.setFontSize(typography.body);
+
+  // Company name with icon-like bullet
+  doc.setFont('helvetica', 'bold');
+  //doc.text('▪', marginX, 90);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.firma || 'Unternehmen', marginX, 90);
+
+  //if (data.name && data.name !== 'Test User (DEBUG)') {
+    //doc.text('▪', marginX, 105);
+    doc.text(data.name, marginX , 105);
+  //}
+
+  // Date on the right
+  const dateStr = new Date().toLocaleDateString('de-DE', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  doc.text(dateStr, pageWidth - marginX, 90, { align: 'right' });
+
+  // Contact email
+  doc.setFontSize(typography.small);
+  doc.textWithLink('meyer@v-und-s.de', pageWidth - marginX, 105, {
+    url: 'mailto:meyer@v-und-s.de',
+    align: 'right'
+  });
+
+  // Add decorative line
+  // doc.setDrawColor(255, 255, 255);
+  // doc.setLineWidth(1);
+  // doc.setGState(new doc.GState({ opacity: 0.3 }));
+  // doc.line(marginX, headerHeight - 15, pageWidth - marginX, headerHeight - 15);
+  // doc.setGState(new doc.GState({ opacity: 1 }));
+
+  let currentY = headerHeight + spacing.lg;
+
+  // Executive Summary Card with premium design
+  const summaryHeight = 140; // Increased height for more spacing
+
+  // Card shadow effect
+  doc.setFillColor(0, 0, 0);
+  doc.setGState(new doc.GState({ opacity: 0.08 }));
+  doc.roundedRect(marginX + 3, currentY + 3, contentW, summaryHeight, 15, 15, 'F');
+  doc.setGState(new doc.GState({ opacity: 1 }));
+
+  // Card background
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(marginX, currentY, contentW, summaryHeight, 15, 15, 'F');
+
+  // Card border
+  doc.setDrawColor(colors.border.r, colors.border.g, colors.border.b);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(marginX, currentY, contentW, summaryHeight, 15, 15, 'S');
+
+  // Summary content with better layout
+  const summaryPadding = 30; // Increased padding
+
+  // Left side - Score visualization
+  const gaugeX = marginX + summaryPadding;
+  const gaugeY = currentY + summaryPadding;
+
+  // Score label
+  doc.setFontSize(typography.small);
+  doc.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+  doc.setFont('helvetica', 'normal');
+  doc.text('GESAMTERGEBNIS', gaugeX, gaugeY + 15); // More space from top
+
+  // Large score display
+  doc.setFontSize(42);
+  const scoreColor = getScoreColor(data.overall);
+  doc.setTextColor(scoreColor.r, scoreColor.g, scoreColor.b);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${data.overall.toFixed(1)}%`, gaugeX, gaugeY + 55); // More space between label and score
+
+  // Visual gauge bar
+  const gaugeWidth = 180;
+  const gaugeHeight = 10;
+  const gaugeYPos = gaugeY + 70; // More space below score
+
+  // Gauge background
+  doc.setFillColor(colors.bgLight.r, colors.bgLight.g, colors.bgLight.b);
+  doc.roundedRect(gaugeX, gaugeYPos, gaugeWidth, gaugeHeight, 5, 5, 'F');
+
+  // Gauge segments for visual reference
+  for (let i = 0; i < 5; i++) {
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(1);
+    doc.line(gaugeX + (i * gaugeWidth / 4), gaugeYPos, gaugeX + (i * gaugeWidth / 4), gaugeYPos + gaugeHeight);
   }
-  headerInfoY += 14;
-  doc.text(`Datum: ${new Date().toLocaleDateString('de-DE')}`, marginX, headerInfoY);
-  doc.textWithLink('meyer@v-und-s.de', pageWidth - marginX - 120, 60, { url: 'mailto:meyer@v-und-s.de' });
 
-  doc.setTextColor(31, 41, 55);
-  let currentY = headerHeight + 24;
+  // Gauge fill
+  doc.setFillColor(scoreColor.r, scoreColor.g, scoreColor.b);
+  const fillWidth = (data.overall / 100) * gaugeWidth;
+  doc.roundedRect(gaugeX, gaugeYPos, fillWidth, gaugeHeight, 5, 5, 'F');
 
-  // Summary card
-  const summaryHeight = 70;
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(marginX, currentY, contentW, summaryHeight, 8, 8, 'F');
-  doc.setDrawColor(brandRgb.r, brandRgb.g, brandRgb.b);
-  doc.roundedRect(marginX, currentY, contentW, summaryHeight, 8, 8, 'S');
-  doc.setFontSize(12);
-  doc.setTextColor(107, 114, 128);
-  doc.text('Gesamtscore', marginX + 18, currentY + 24);
-  doc.setFontSize(30);
+  // Right side - Maturity level
+  const maturityX = marginX + contentW / 2 + 30;
+
+  doc.setFontSize(typography.small);
+  doc.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+  doc.setFont('helvetica', 'normal');
+  doc.text('REIFEGRAD-STUFE', maturityX, gaugeY + 15); // Aligned with left side
+
+  // Level badge
+  doc.setFillColor(brandRgb.r, brandRgb.g, brandRgb.b);
+  doc.setGState(new doc.GState({ opacity: 0.1 }));
+  doc.roundedRect(maturityX - 5, gaugeY + 25, 80, 35, 8, 8, 'F'); // Taller badge for more spacing
+  doc.setGState(new doc.GState({ opacity: 1 }));
+
+  doc.setFontSize(typography.title);
   doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
-  doc.text(`${data.overall.toFixed(1)}%`, marginX + 18, currentY + 52);
-  doc.setFontSize(12);
-  doc.setTextColor(31, 41, 55);
-  doc.text(`Reifegrad: Level ${data.gartner.level} – ${data.gartner.name}`, marginX + 200, currentY + 32);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Level ${data.gartner.level}`, maturityX, gaugeY + 45); // More space
 
-  currentY += summaryHeight + 36; // More space after summary
+  doc.setFontSize(typography.subtitle);
+  doc.setTextColor(colors.dark.r, colors.dark.g, colors.dark.b);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.gartner.name, maturityX, gaugeY + 75); // Even more space below badge
 
-  // Dimension scores table
-  doc.setFontSize(12);
-  doc.setTextColor(31, 41, 55);
-  doc.text('Scores je Dimension', marginX, currentY);
-  currentY += 12;
+  currentY += summaryHeight + spacing.xl;
 
-  const tableGap = 12;
-  const colWidth = (contentW - tableGap) / 2;
-  const rowHeight = 42;
+  // Section title helper with decorative element
+  const addSectionTitle = (title, y) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(typography.title);
+    doc.setTextColor(colors.dark.r, colors.dark.g, colors.dark.b);
+    doc.text(title, marginX, y);
+
+    // Decorative accent line
+    doc.setDrawColor(brandRgb.r, brandRgb.g, brandRgb.b);
+    doc.setLineWidth(3);
+    doc.line(marginX, y + 6, marginX + 50, y + 6);
+
+    return y + spacing.md;
+  };
+
+  // Dimension scores with premium cards
+  currentY = addSectionTitle('Detaillierte Bewertung nach Dimensionen', currentY);
+
+  const cardGap = 20;
+  const cardWidth = (contentW - cardGap) / 2;
+  const cardHeight = 85;
   const numRows = Math.ceil(data.orderLabels.length / 2);
 
   for (let row = 0; row < numRows; row++) {
+    currentY = newPageIfNeeded(currentY, cardHeight);
+
     for (let col = 0; col < 2; col++) {
       const idx = row * 2 + col;
       if (idx >= data.orderLabels.length) break;
-      const cellX = marginX + col * (colWidth + tableGap);
-      const cellY = currentY + row * rowHeight;
-      doc.setFillColor(252, 252, 252);
-      doc.roundedRect(cellX, cellY, colWidth, rowHeight - 8, 6, 6, 'F');
-      doc.setDrawColor(229, 231, 235);
-      doc.roundedRect(cellX, cellY, colWidth, rowHeight - 8, 6, 6, 'S');
-      doc.setFontSize(11);
-      doc.setTextColor(107, 114, 128);
-      doc.text(data.orderLabels[idx], cellX + 14, cellY + 18);
-      doc.setFontSize(18);
-      doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
-      doc.text(`${data.orderValues[idx].toFixed(1)}%`, cellX + 14, cellY + 36);
+
+      const cellX = marginX + col * (cardWidth + cardGap);
+      const cellY = currentY;
+      const score = data.orderValues[idx];
+      const scoreColor = getScoreColor(score);
+
+      // Card shadow
+      doc.setFillColor(0, 0, 0);
+      doc.setGState(new doc.GState({ opacity: 0.05 }));
+      doc.roundedRect(cellX + 2, cellY + 2, cardWidth, cardHeight, 10, 10, 'F');
+      doc.setGState(new doc.GState({ opacity: 1 }));
+
+      // Card background
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(cellX, cellY, cardWidth, cardHeight, 10, 10, 'F');
+
+      // Card border
+      doc.setDrawColor(colors.border.r, colors.border.g, colors.border.b);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(cellX, cellY, cardWidth, cardHeight, 10, 10, 'S');
+
+      // Simple accent bar on left (using brand color for visual hierarchy)
+      doc.setFillColor(brandRgb.r, brandRgb.g, brandRgb.b);
+      doc.roundedRect(cellX, cellY, 4, cardHeight, 10, 0, 'F');
+
+      // Card content
+      doc.setFontSize(typography.body);
+      doc.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+      doc.setFont('helvetica', 'normal');
+      doc.text(data.orderLabels[idx], cellX + 20, cellY + 25);
+
+      // Score with large font
+      doc.setFontSize(24);
+      doc.setTextColor(scoreColor.r, scoreColor.g, scoreColor.b);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${score.toFixed(1)}%`, cellX + 20, cellY + 52);
+
+      // Mini progress bar with brand color
+      const barWidth = cardWidth - 40;
+      const barHeight = 6;
+      const barY = cellY + 62;
+
+      doc.setFillColor(colors.bgLight.r, colors.bgLight.g, colors.bgLight.b);
+      doc.roundedRect(cellX + 20, barY, barWidth, barHeight, 3, 3, 'F');
+
+      doc.setFillColor(brandRgb.r, brandRgb.g, brandRgb.b);
+      const fillW = (score / 100) * barWidth;
+      doc.roundedRect(cellX + 20, barY, fillW, barHeight, 3, 3, 'F');
     }
+
+    currentY += cardHeight + spacing.sm;
   }
 
-  currentY += numRows * rowHeight + 28; // More space after table
+  currentY += spacing.md;
 
-  // Radar chart (if available) - larger size
+  // Radar chart with premium frame
   const canvas = document.getElementById('radar');
   if (canvas) {
-    const chartHeight = 300; // Increased from 220
-    currentY = newPageIfNeeded(currentY, chartHeight + 60); // More space
-    doc.setFontSize(12);
-    doc.setTextColor(31, 41, 55);
-    doc.text('Radar-Darstellung', marginX, currentY);
-    currentY += 20; // More space after title
+    const chartHeight = 380; // Larger for premium look
+    currentY = newPageIfNeeded(currentY, chartHeight + 80);
+
+    currentY = addSectionTitle('Kompetenzprofil-Visualisierung', currentY);
+
+    // Chart frame/card
+    doc.setFillColor(0, 0, 0);
+    doc.setGState(new doc.GState({ opacity: 0.05 }));
+    doc.roundedRect(marginX + 2, currentY + 2, contentW, chartHeight + 20, 12, 12, 'F');
+    doc.setGState(new doc.GState({ opacity: 1 }));
+
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(marginX, currentY, contentW, chartHeight + 20, 12, 12, 'F');
+
+    doc.setDrawColor(colors.border.r, colors.border.g, colors.border.b);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(marginX, currentY, contentW, chartHeight + 20, 12, 12, 'S');
+
+    // Export radar chart at higher quality
     const imgData = canvas.toDataURL('image/png', 1.0);
-    const ratio = canvas.height ? (canvas.height / canvas.width) : (320 / 480);
-    const imgW = Math.min(contentW, chartHeight / ratio);
+    const ratio = canvas.height ? (canvas.height / canvas.width) : 1;
+    const imgW = Math.min(contentW - 40, chartHeight / ratio);
     const imgH = imgW * ratio;
     const offsetX = marginX + (contentW - imgW) / 2;
-    doc.addImage(imgData, 'PNG', offsetX, currentY, imgW, imgH);
-    currentY += imgH + 40; // More space after chart
+
+    doc.addImage(imgData, 'PNG', offsetX, currentY + 10, imgW, imgH);
+    currentY += chartHeight + spacing.xl;
   }
 
-  // Disclaimer section
-  currentY = newPageIfNeeded(currentY, 120); // Ensure enough space for disclaimer
-  currentY += 20; // Extra space before disclaimer
+  // Premium disclaimer section
+  currentY = newPageIfNeeded(currentY, 150);
+  currentY += spacing.md;
 
-  doc.setFontSize(10);
-  doc.setTextColor(107, 114, 128);
-  const disclaimerText = "Die Ergebnisse geben Ihnen einen ersten Eindruck Ihres KI-Reifegrads. Eine vollständige Bewertung umfasst jedoch weitere qualitative Aspekte – sprechen Sie uns gern für eine vertiefte Analyse an und vereinbaren Sie jetzt Ihr unverbindliches und kostenfreies Erstgespräch. Im Gespräch erfahren Sie, wie andere Unternehmen ihren Weg weitergegangen sind – und welche Optionen es für Sie gibt. Bei Interesse:";
+  // Disclaimer card
+  doc.setFillColor(colors.bgLight.r, colors.bgLight.g, colors.bgLight.b);
+  doc.roundedRect(marginX, currentY, contentW, 120, 12, 12, 'F');
 
-  const lines = doc.splitTextToSize(disclaimerText, contentW);
-  doc.text(lines, marginX, currentY);
-  currentY += lines.length * 12 + 10; // Space for text + gap
+  doc.setFontSize(typography.body);
+  doc.setTextColor(colors.dark.r, colors.dark.g, colors.dark.b);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Nächste Schritte', marginX + 20, currentY + 25);
 
-  // Clickable email link
-  doc.setFontSize(10);
-  doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
-  doc.textWithLink('meyer@v-und-s.de', marginX, currentY, { url: 'mailto:meyer@v-und-s.de' });
+  doc.setFontSize(typography.small);
+  doc.setTextColor(colors.gray.r, colors.gray.g, colors.gray.b);
+  doc.setFont('helvetica', 'normal');
+
+  const disclaimerText = "Die Ergebnisse geben Ihnen einen ersten Eindruck Ihres KI-Reifegrads. Eine vollständige Bewertung umfasst jedoch weitere qualitative Aspekte. Vereinbaren Sie jetzt Ihr unverbindliches und kostenfreies Erstgespräch.";
+
+  const lines = doc.splitTextToSize(disclaimerText, contentW - 40);
+  let lineY = currentY + 45;
+  lines.forEach((line, i) => {
+    doc.text(line, marginX + 20, lineY + (i * 14));
+  });
+
+  // Calculate dynamic button position based on text height
+  const textEndY = lineY + (lines.length * 14);
+  const btnY = textEndY + 20; // Add 20pt spacing after text
+
+  doc.setFillColor(brandRgb.r, brandRgb.g, brandRgb.b);
+  doc.roundedRect(marginX + 20, btnY, 140, 25, 5, 5, 'F');
+
+  doc.setFontSize(typography.small);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.textWithLink('meyer@v-und-s.de', marginX + 90, btnY + 16, {
+    url: 'mailto:meyer@v-und-s.de',
+    align: 'center'
+  });
+
+  // Add page footer to first page
+  addPageFooter(1);
 
   const safeName = (data.firma || 'unternehmen').replace(/[^a-z0-9_-]+/gi, '_');
-  doc.save(`auswertung_${safeName}_${Date.now()}.pdf`);
+  doc.save(`ki-reifegrad_${safeName}_${Date.now()}.pdf`);
 }
 
 // ---------- Events ----------
@@ -1353,12 +1695,22 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 
 document.getElementById('download-btn')?.addEventListener('click', async () => {
   const firmaVal = (document.getElementById('firma')?.value || '').trim();
-  if (!firmaVal) {
+
+  // In debug mode, use default firma if not provided
+  if (DEBUG_MODE && !firmaVal) {
+    document.getElementById('firma').value = 'TEST COMPANY (DEBUG)';
+  } else if (!firmaVal) {
     showMessage('Fehler', 'Bitte geben Sie den Firmennamen an.');
     document.getElementById('firma')?.focus();
     return;
   }
-  const data = collectData(true);
+
+  // In debug mode, fill missing data with defaults
+  if (DEBUG_MODE) {
+    fillDebugDefaults();
+  }
+
+  const data = collectData(!DEBUG_MODE); // Only require all if NOT in debug
   if (!data) {
     showMessage('Fehler', 'Bitte beantworten Sie alle Fragen, bevor Sie die Auswertung herunterladen.');
     return;
@@ -1389,8 +1741,11 @@ function hideMessage() {
 }
 
 // Init
-renderMcq();
-renderLikert();
+document.addEventListener('DOMContentLoaded', async () => {
+  renderMcq();
+  renderLikert();
+  await loadDebugMode();
+});
 
 // Bind progress and enable/disable logic
 (function initUX(){
@@ -1418,7 +1773,7 @@ renderLikert();
     if (txt) txt.textContent = `${answered}/${total}`;
     const calc = document.getElementById('calc-btn');
     const firma = (document.getElementById('firma')?.value || '').trim();
-    const ready = answered === total && !!firma;
+    const ready = (answered === total && !!firma) || DEBUG_MODE; // Enable in debug mode
     if (calc) calc.disabled = !ready;
 
     // Build hint message if not ready
@@ -1427,7 +1782,7 @@ renderLikert();
       if (ready) {
         hint.classList.add('hidden');
         hint.textContent = '';
-      } else {
+      } else if (!DEBUG_MODE) { // Only show hints in production mode
         const missing = [];
         if (!firma) missing.push('Firmenname');
         MCQ_DIMENSIONS.forEach(dim => {
@@ -1436,6 +1791,11 @@ renderLikert();
         });
         hint.textContent = 'Bitte fehlende Angaben ergänzen: ' + missing.join(', ');
         hint.classList.remove('hidden');
+      } else {
+        // In debug mode, show debug message instead
+        hint.textContent = 'DEBUG MODE: Auswertung ohne vollständige Daten möglich';
+        hint.classList.remove('hidden');
+        hint.style.color = '#d97706'; // Orange color for debug
       }
     }
   };

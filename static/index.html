@@ -21,9 +21,14 @@
     }
     body { font-family: 'Inter', sans-serif; }
     /* Gartner scale bar */
-    .scale-container { position: relative; height: 1.5rem; display: flex; align-items: center; border-radius:9999px; overflow:hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06); }
-    .scale-segment { height:100%; flex-grow:1; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:0.75rem; line-height:1rem; text-shadow:1px 1px 2px rgba(0,0,0,0.2); }
+    .scale-container { position: relative; height: 1.5rem; display: flex; align-items: center; border-radius:9999px; overflow:hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06); margin: 0 10px; }
+    .scale-segment { height:100%; flex-grow:1; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:0.75rem; line-height:1rem; text-shadow:1px 1px 2px rgba(0,0,0,0.2); min-width: 0; }
     .indicator { position:absolute; width:1rem; height:1rem; background:#fff; border-radius:9999px; box-shadow:0 2px 4px rgba(0,0,0,0.2); transform:translateX(-50%); transition:left .5s ease-in-out; border:2px solid; z-index:10; }
+    @media (max-width: 640px) {
+      .scale-container { margin: 0 5px; height: 1.25rem; }
+      .scale-segment { font-size: 0.625rem; padding: 0 2px; }
+      .indicator { width: 0.75rem; height: 0.75rem; }
+    }
     /* Gauge bars for per-dimension scores */
     .gauge-bar-container { width:100%; height:0.75rem; background:#e5e7eb; border-radius:9999px; overflow:hidden; }
     .gauge-bar { height:100%; border-radius:9999px; transition: width .5s ease-in-out, background-color .5s ease-in-out; background-color:#ef4444; }
@@ -287,11 +292,26 @@ Erkennen Sie Ihre Stärken und Potenziale im KI-Reifegrad – übersichtlich dar
         <div class="mt-4">
           <p class="text-sm text-center text-gray-600 mb-2">Ihr KI-Reifegrad</p>
           <div class="scale-container">
-            <div class="scale-segment bg-red-500">Awareness</div>
-            <div class="scale-segment bg-orange-500">Active</div>
-            <div class="scale-segment bg-green-500">Operational</div>
-            <div class="scale-segment bg-blue-500">Systemic</div>
-            <div class="scale-segment bg-purple-500">Transformational</div>
+            <div class="scale-segment bg-red-500">
+              <span class="hidden sm:inline">Awareness</span>
+              <span class="sm:hidden">Awa</span>
+            </div>
+            <div class="scale-segment bg-orange-500">
+              <span class="hidden sm:inline">Active</span>
+              <span class="sm:hidden">Act</span>
+            </div>
+            <div class="scale-segment bg-green-500">
+              <span class="hidden sm:inline">Operational</span>
+              <span class="sm:hidden">Ope</span>
+            </div>
+            <div class="scale-segment bg-blue-500">
+              <span class="hidden sm:inline">Systemic</span>
+              <span class="sm:hidden">Sys</span>
+            </div>
+            <div class="scale-segment bg-purple-500">
+              <span class="hidden sm:inline">Transformational</span>
+              <span class="sm:hidden">Tra</span>
+            </div>
             <div id="indicator" class="indicator border-red-500" style="left:0%;"></div>
           </div>
           <p id="maturity-text" class="text-center mt-2 font-semibold text-gray-800 text-base">Level 1: Awareness</p>
@@ -514,7 +534,7 @@ const MCQ_DIMENSIONS = [
     options: [
       "Unklar, ob geeignete Tools/Infrastruktur verfügbar sind.",
       "Service-Teams haben Zugang zu erforderlichen Tools/Infrastruktur.",
-      "Standardisierung/Zentralisierung mit klaren Leitplanken (Modelle/Plattformen).",
+      "Standardisierung / Zentralisierung mit klaren Leitplanken (Modelle/Plattformen).",
       "Reibungslose Bereitstellung & Skalierung; Integration in Workflows."
     ]
   },
